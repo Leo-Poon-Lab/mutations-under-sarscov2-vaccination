@@ -180,11 +180,13 @@ df_snvs_meta_add_qc$sample <- df_snvs_meta_add_qc$Sample
 write_csv(df_snvs_meta_add_qc, "../results/df_snvs_meta_add_qc_ivar.csv")
 
 df_snvs_meta_add_qc_bam <- read_csv("../results/df_snvs_meta_add_qc_bam.csv")
-df_snvs_meta_add_qc_bam <- df_snvs_meta_add_qc_bam %>% filter(Vaccine %in% vaccine_of_interest)
-df_snvs_meta_add_qc_bam <- df_snvs_meta_add_qc_bam %>% filter(!(lineage_sim!="Delta" & Vaccine!="Non-vaccinated"))
 
-df_snvs_meta_add_qc
 (check <- paste(df_snvs_meta_add_qc$Sample, df_snvs_meta_add_qc$X2) %in% paste(df_snvs_meta_add_qc_bam$Sample, df_snvs_meta_add_qc_bam$pos))
+as.character(df_snvs_meta_add_qc[!check,])
+
+(check <- paste(df_snvs_meta_add_qc_bam$Sample, df_snvs_meta_add_qc_bam$pos) %in% paste(df_snvs_meta_add_qc$Sample, df_snvs_meta_add_qc$X2))
+df_tmp <- df_snvs_meta_add_qc_bam[!check,]
+write_csv(df_tmp, "../results/tmp.csv")
 
 ## 4. analyse the number of mutations, the frequency of mutations, diversity.
 ### Number of iSNV mutations 

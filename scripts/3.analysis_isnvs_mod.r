@@ -18,6 +18,7 @@ df_meta <- read_csv("../data/df_samples_vaccine_bt_study.csv")
 df_meta$`Ct value`[df_meta$`Ct value`==0] <- NA
 df_vaccine_type <- readxl::read_excel("../data/Vaccination case for breakthrough infection .xlsx", skip=1)
 df_vaccine_type <- df_vaccine_type %>% select(Vaccine, `Vaccine type`) %>% unique()
+vaccine_of_interest <- c("BioNTech", "Sinovac", "Non-vaccinated")
 
 df_lin <- read_csv("../results/lineage.csv")
 df_lin$Sample <- sapply(df_lin$taxon, function(x) {
@@ -112,12 +113,13 @@ df_snvs_meta_append <- mclapply(seq_len(nrow(df_snvs_meta)), function(i) {
 df_snvs_meta_append <- bind_rows(df_snvs_meta_append)
 df_mut_meta_add <- bind_cols(df_snvs_meta, df_snvs_meta_append)
 
-df_snvs_meta %>% filter(Sample=="WHP4903", pos==20207) %>% as.character()
+df_snvs_meta_add_qc_bam <- df_mut_meta_add %>% filter(reads_pp>=100) %>% filter(sec_freq>=0.03) %>% filter((sec_fwd+sec_rev)>=5 & sec_fwd>=1 & sec_rev>=1) %>% filter(nchar(sec_base)==1 & nchar(con_base)==1)
+df_snvs_meta_add_qc_bam <- df_snvs_meta_add_qc_bam %>% filter(Vaccine %in% vaccine_of_interest)
+df_snvs_meta_add_qc_bam <- df_snvs_meta_add_qc_bam %>% filter(!(lineage_sim!="Delta" & Vaccine!="Non-vaccinated"))
 
+write_csv(df_snvs_meta_add_qc_bam, "../results/df_snvs_meta_add_qc_bam.csv")
 
-df_snvs_meta_add_qc <- df_mut_meta_add %>% filter(reads_pp>=100) %>% filter(sec_freq>=0.03) %>% filter((sec_fwd+sec_rev)>=5 & sec_fwd>=1 & sec_rev>=1) %>% filter(nchar(sec_base)==1)
-write_csv(df_snvs_meta_add_qc, "../results/df_snvs_meta_add_qc_bam.csv")
-
+df_snvs_meta_add_qc <- df_snvs_meta_add_qc_bam
 #### test different MAF cutoffs
 #### The minor allele frequency (secondary most base frequency) cutoff for determining iSNVs
 cut_offs <- 3:10/100
@@ -135,7 +137,7 @@ ggplot(df_plot) + # iSNV threshold
 ggsave("../results/MAF-cutoff.pdf", height = 8, width = 6)
 
 #### 2. The mutations should be supported by at least 3% of the total reads (minor allele frequency >=3%).
-df_snvs_meta_add_qc <- df_snvs_meta_add_qc %>% filter(sec_freq>=0.05) 
+df_snvs_meta_add_qc <- df_snvs_meta_add_qc %>% filter(sec_freq>=0.03) 
 df_snvs_meta_add_qc$sample <- df_snvs_meta_add_qc$Sample
 
 ## 4. analyse the number of mutations, the frequency of mutations, diversity.
