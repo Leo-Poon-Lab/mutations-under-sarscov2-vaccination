@@ -82,5 +82,3 @@ files_fastq2 <- files_fastq_all[samples_all %in% paste0(samples_toupload, "_2")]
 sapply(c(files_fastq1, files_fastq2), function(x){
 	cp.remote(path.src = x, remote.src = "", remote.dest = "hggu@147.8.70.135", path.dest = "~/work/2020-09-01_COVID_NGS_pipeline/archive/", verbose = T)
 })
-
-
