@@ -8,9 +8,7 @@ library(tidyverse)
 library(Biostrings)
 library(ggsci)
 library(parallel)
-
-df_epitope <- readxl::read_excel("../data/df_t_cell_epitope.xlsx")
-df_epitope$found_in <- sapply(strsplit(df_epitope$`Reference(s)*`, ", "), length)
+source("https://raw.githubusercontent.com/Koohoko/Save-ggplot-to-pptx/main/scripts/save_pptx.r")
 
 colors_lineage=c("#ff7f00", "#33a02c", "#1f78b4")
 names(colors_lineage) <- c("Alpha", "B.1", "Delta")
@@ -77,6 +75,7 @@ samples_hq <- df_bam_rst_depth %>% filter(n_high_depth>=27000) %>% .$sample
 
 ### only include samples with Ct value < 25
 samples_hq <- samples_hq[samples_hq %in% df_meta$Sample[round(as.numeric(df_meta$`Ct value`)) < 25]]
+samples_hq <- samples_hq[samples_hq!="WHP4499"]
 writeLines(samples_hq, "../results/samples_hq.txt")
 samples_hq <- readLines("../results/samples_hq.txt")
 
@@ -165,7 +164,7 @@ df_snvs_meta_add_qc <- df_snvs_meta_add_qc %>% filter(!(lineage_sim!="Delta" & V
 #### The minor allele frequency (secondary most base frequency) cutoff for determining iSNVs
 cut_offs <- 3:10/100
 df_plot <- lapply(cut_offs, function(x) {
-	df_snvs_meta_add_qc %>% group_by(Sample, Vaccine, `Vaccine type`) %>% filter(sec_freq>=x) %>% summarise(n=n(), Ct_value=`Ct value`[1], alle_freq=as.character(x))
+	df_snvs_meta_add_qc %>% group_by(Sample, Vaccine, Doses, days_since_last_dose, `Vaccine type`) %>% filter(sec_freq>=x) %>% summarise(n=n(), Ct_value=`Ct value`[1], alle_freq=as.character(x))
 })
 df_plot <- bind_rows(df_plot)
 
@@ -175,15 +174,22 @@ ggplot(df_plot) + # iSNV threshold
 	xlab("Ct value")+
 	ylab("No. of identified iSNVs")+
 	scale_color_manual(values=colors_vaccine_type)
-ggsave("../results/MAF-cutoff.pdf", height = 8, width = 6)
+ggsave("../results/MAF-cutoff_Ct.pdf", height = 8, width = 6)
+
+ggplot(df_plot) + 
+	geom_point(aes(x=abs(days_since_last_dose), y=n, color=`Vaccine type`), alpha=0.6)+
+	facet_wrap(vars(alle_freq), ncol=2)+
+	xlab("Days since last dose")+
+	ylab("No. of identified iSNVs")+
+	scale_color_manual(values=colors_vaccine_type)
+ggsave("../results/MAF-cutoff_doses.pdf", height = 8, width = 6)
 
 #### 2. The mutations should be supported by at least 3% of the total reads (minor allele frequency >=3%).
 df_snvs_meta_add_qc <- df_snvs_meta_add_qc %>% filter(sec_freq>=0.03) 
 df_snvs_meta_add_qc$sample <- df_snvs_meta_add_qc$Sample
 write_csv(df_snvs_meta_add_qc, "../results/df_snvs_meta_add_qc_ivar.csv")
 
-df_snvs_meta_add_qc_bam <- read_csv("../results/df_snvs_meta_add_qc_bam.csv")
-
+# df_snvs_meta_add_qc_bam <- read_csv("../results/df_snvs_meta_add_qc_bam.csv")
 # df_tmp <- df_snvs_meta_add_qc_bam[df_snvs_meta_add_qc_bam$con_base!=df_snvs_meta_add_qc_bam$ref,]
 # write_csv(df_tmp, "../results/tmp.csv")
 
@@ -196,7 +202,7 @@ df_snvs_meta_add_qc_bam <- read_csv("../results/df_snvs_meta_add_qc_bam.csv")
 
 ## 4. analyse the number of mutations, the frequency of mutations, diversity.
 ### Number of iSNV mutations 
-df_plot <- df_snvs_meta_add_qc_bam %>% filter(sec_freq>0.05)
+# df_plot <- df_snvs_meta_add_qc_bam %>% filter(sec_freq>0.03)
 df_plot <- df_snvs_meta_add_qc
 df_plot$sample <- df_plot$Sample
 df_tmp <- df_plot %>% group_by(sample) %>% summarise(n=n())
@@ -214,7 +220,8 @@ ggplot(df_plot_n, aes(x=`Vaccine type`, y=n_per_kb, color=lineage_sim))+ # mutat
 	scale_color_manual(name="Lineage", values=colors_lineage)+
 	theme_classic()+
 	NULL
-ggsave("../results/Num_isnvs_by_vaccine_type.pdf")
+ggsave("../results/Num_isnvs_by_vaccine_type.pdf", width=6, height=4)
+save_pptx("../results/Num_isnvs_by_vaccine_type.pptx", width=6, height=4)
 
 ggplot(df_plot_n, aes(x=`Vaccine`, y=n_per_kb, color=lineage_sim))+ # mutation rate
 	geom_point(alpha=0.8, position=position_jitterdodge(jitter.width=0.1))+
@@ -225,125 +232,55 @@ ggplot(df_plot_n, aes(x=`Vaccine`, y=n_per_kb, color=lineage_sim))+ # mutation r
 	theme_classic()+
 	# theme_minimal()+
 	NULL
-ggsave("../results/Num_isnvs_by_vaccine.pdf")
+ggsave("../results/Num_isnvs_by_vaccine.pdf", width=6, height=4)
+save_pptx("../results/Num_isnvs_by_vaccine.pptx", width=6, height=4)
 
-##### Comparison within unvaccinated
-wilcox.test(df_plot_n$n_per_kb[df_plot_n$lineage_sim=="Alpha" & df_plot_n$Vaccine=="Non-vaccinated"], df_plot_n$n_per_kb[df_plot_n$lineage_sim=="Delta" & df_plot_n$Vaccine=="Non-vaccinated"])
-wilcox.test(df_plot_n$n_per_kb[df_plot_n$lineage_sim=="Alpha" & df_plot_n$Vaccine=="Non-vaccinated"], df_plot_n$n_per_kb[df_plot_n$lineage_sim=="B.1" & df_plot_n$Vaccine=="Non-vaccinated"]) 
-wilcox.test(df_plot_n$n_per_kb[df_plot_n$lineage_sim=="Delta" & df_plot_n$Vaccine=="Non-vaccinated"], df_plot_n$n_per_kb[df_plot_n$lineage_sim=="B.1" & df_plot_n$Vaccine=="Non-vaccinated"]) 
+df_plot_n_gene <- df_plot %>% group_by(sample, Vaccine, lineage_sim, gene) %>% summarise(n=n())
+length_gene <- apply(df_plot_n_gene, 1, function(x) {
+	print(x)
+	df_bam_rst %>% filter(reads_pp>=100) %>% filter(sample==x[1] & pos>=df_orf_sim$start[df_orf_sim$sequence==x[2]] & pos<=df_orf_sim$stop[df_orf_sim$sequence==x[2]]) %>% nrow()
+})
+df_plot_n_gene$length_gene <- length_gene
+df_plot_n_gene$n_per_kb <- df_plot_n_gene$n/df_plot_n_gene$length_gene*1000
 
-##### Comparison between unvaccinated and vaccinated
-wilcox.test(df_plot_n$n_per_kb[df_plot_n$lineage_sim=="Delta" & df_plot_n$Vaccine=="Non-vaccinated"], df_plot_n$n_per_kb[df_plot_n$lineage_sim=="Delta" & df_plot_n$Vaccine!="Non-vaccinated"]) # Vac Delta and Unvac Delta
-wilcox.test(df_plot_n$n_per_kb[df_plot_n$lineage_sim=="B.1" & df_plot_n$Vaccine=="Non-vaccinated"], df_plot_n$n_per_kb[df_plot_n$lineage_sim=="Delta" & df_plot_n$Vaccine!="Non-vaccinated"]) # Vac Delta and Unvac B.1
-wilcox.test(df_plot_n$n_per_kb[df_plot_n$Vaccine=="Non-vaccinated" & df_plot_n$lineage_sim=="Delta"], df_plot_n$n_per_kb[df_plot_n$Vaccine=="BioNTech" & df_plot_n$lineage_sim=="Delta"]) # Vac BioNTech Delta and Unvac Delta
-wilcox.test(df_plot_n$n_per_kb[df_plot_n$Vaccine=="Non-vaccinated" & df_plot_n$lineage_sim=="Delta"], df_plot_n$n_per_kb[df_plot_n$Vaccine=="Sinovac" & df_plot_n$lineage_sim=="Delta"])
+df_plot_n$gene <- "Full genome"
+df_plot_n_gene <- bind_rows(df_plot_n, df_plot_n_gene)
 
-wilcox.test(df_plot_n$n_per_kb[df_plot_n$`Vaccine type`=="Non-vaccinated"], df_plot_n$n_per_kb[df_plot_n$`Vaccine type`=="Inactivated"])
-wilcox.test(df_plot_n$n_per_kb[df_plot_n$`Vaccine type`=="Non-vaccinated" & df_plot_n$lineage_sim=="Delta"], df_plot_n$n_per_kb[df_plot_n$`Vaccine type`=="Inactivated" & df_plot_n$lineage_sim=="Delta"])
-wilcox.test(df_plot_n$n_per_kb[df_plot_n$`Vaccine type`=="Non-vaccinated"], df_plot_n$n_per_kb[df_plot_n$`Vaccine type`=="mRNA"]) # Unvac all and mRNA Delta/All
-
-##### Comparison within vaccinated
-wilcox.test(df_plot_n$n_per_kb[df_plot_n$Vaccine=="Sinovac"], df_plot_n$n_per_kb[df_plot_n$Vaccine=="BioNTech"])
-
-### Diversity of samples
-#### we use nucleotide diversity pi here (Ref: https://academic.oup.com/ve/article/5/1/vey041/5304643, https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4316684/)
-source("./helper/cal_nu_diveristy_pi.r")
-df_orf_sim <- read_csv("../data/ORF_SCoV2_sim.csv")
-# all(unique(df_plot$gene) %in% df_orf_sim$sequence)
-
-list_samples <- df_plot$sample %>% unique()
-df_diveristy <- mclapply(list_samples, function(sample_t) {
-	print(sample_t)
-	# sample_t <- list_samples[1]
-	df_mut_t <- df_plot %>% filter(sample==sample_t)
-	df_bam_t <- df_bam_rst %>% filter(sample==sample_t)	
-	df_out <- tibble(gene="Full", pi_all=NA, pi_s=NA, pi_n=NA)
-
-	## pi over the full genome
-	dls <- sapply(df_mut_t$X2, function(pos_i) {
-		df_bam_t_i <- df_bam_t %>% filter(pos==pos_i)
-		Cal_dl(c(df_bam_t_i$A_pp, df_bam_t_i$C_pp, df_bam_t_i$T_pp, df_bam_t_i$G_pp ))
-	})
-	length_full <- df_bam_t %>% filter(reads_pp>=100) %>% summarise(n_high_depth=n())  %>% .$n_high_depth
-	df_out$pi_all <- Cal_pi(dls, length_full)
-	## pi s
-	df_out$pi_s <- Cal_pi(dls[df_mut_t$effect=="synonymous_variant"], length_full)
-	## pi n
-	df_out$pi_n <- Cal_pi(dls[df_mut_t$effect=="missense_variant"], length_full)
-
-	## pi in different genes (pi n, pi s)
-	df_out_gene <- lapply(seq_len(nrow(df_orf_sim)), function(i) {
-		# print(i)
-		gene_i <- df_orf_sim$sequence[i]
-		df_mut_t_i <- df_mut_t %>% filter(gene==gene_i)
-		df_out_i <- tibble(gene=gene_i, pi_all=NA, pi_s=NA, pi_n=NA)
-		if(nrow(df_mut_t_i)==0){return(df_out_i)}
-		# pi all
-		dls <- sapply(df_mut_t_i$X2, function(pos_i) {
-			df_bam_t_i <- df_bam_t %>% filter(pos==pos_i)
-			Cal_dl(c(df_bam_t_i$A_pp, df_bam_t_i$C_pp, df_bam_t_i$T_pp, df_bam_t_i$G_pp ))
-		})
-		df_bam_t_i <- df_bam_t %>% filter(pos>=df_orf_sim$start[i] & pos<=df_orf_sim$stop[i])
-		length_full <- df_bam_t_i %>% filter(reads_pp>=100) %>% summarise(n_high_depth=n())  %>% .$n_high_depth
-		df_out_i$pi_all <- Cal_pi(dls, length_full)
-		# pi s
-		df_out_i$pi_s <- Cal_pi(dls[df_mut_t_i$effect=="synonymous_variant"], length_full)
-		# pi n
-		df_out_i$pi_n <- Cal_pi(dls[df_mut_t_i$effect=="missense_variant"], length_full)
-		return(df_out_i)
-	})
-	df_out <- bind_rows(df_out, df_out_gene)
-	df_out$sample=sample_t
-	return(df_out)
-}, mc.cores=8)
-df_diveristy <- bind_rows(df_diveristy)
-df_diveristy$pi_n_pi_s <- df_diveristy$pi_n/df_diveristy$pi_s
-df_diveristy <- left_join(df_diveristy, df_plot %>% select(lineage_sim, sample, Vaccine) %>% unique(), "sample")
-
-ggplot(df_diveristy %>% filter(gene %in% c("Full", "ORF1ab", "S")), aes(x=`Vaccine`, y=pi_n_pi_s, color=lineage_sim))+ # mutation rate
+ggplot(df_plot_n_gene %>% filter(gene %in% c("Full genome", "ORF1ab", "S")), aes(x=`Vaccine`, y=n_per_kb, color=lineage_sim))+ # mutation rate per gene
 	geom_point(alpha=0.8, position=position_jitterdodge(jitter.width=0.1))+
 	geom_boxplot(outlier.size=0, outlier.alpha=0, alpha=0.8)+
-	facet_wrap(vars(gene), scales="free_x", ncol=1)+
-	ylab(expression(pi[N]~"/"~pi["S"]))+
+	facet_grid(rows=vars(gene))+
+	ylab("Numer of iSNVs per Kb")+
 	xlab("Group")+
 	scale_color_manual(name="Lineage", values=colors_lineage)+
 	theme_classic()+
 	# theme_minimal()+
-	NULL
-ggsave("../results/diveristy_pin_pis.pdf")
+	NULL	
+	
+ggsave("../results/Num_isnvs_by_vaccine_gene.pdf", width=8, height=6)
+save_pptx("../results/Num_isnvs_by_vaccine_gene.pptx", width=8, height=6)
 
-ggplot(df_diveristy %>% filter(gene %in% c("Full", "ORF1ab", "S")), aes(x=`Vaccine`, y=pi_all, color=lineage_sim))+ # mutation rate
-	geom_point(alpha=0.8, position=position_jitterdodge(jitter.width=0.1))+
-	geom_boxplot(outlier.size=0, outlier.alpha=0, alpha=0.8)+
-	facet_wrap(vars(gene), scales="free_x", ncol=1)+
-	ylab("Nucleotide diversity")+
-	xlab("Group")+
-	scale_color_manual(name="Lineage", values=colors_lineage)+
-	theme_classic()+
-	# theme_minimal()+
-	NULL
-ggsave("../results/tmp.pdf")
-
-df_groups <- df_diveristy %>% filter(gene %in% c("Full", "ORF1ab", "S")) %>% select(gene) %>% unique() 
+df_groups <- df_plot_n_gene %>% filter(gene %in% c("Full genome", "ORF1ab", "S")) %>% select(gene) %>% unique() 
 df_wilc_test <- lapply(seq_len(nrow(df_groups)), function(i) {
-	df_tmp <- df_diveristy %>% filter(gene==df_groups$gene[i])
+	df_tmp <- df_plot_n_gene %>% filter(gene==df_groups$gene[i])
 	df_tmp_grps <- df_tmp %>% select(Vaccine, lineage_sim) %>% unique()
 	df_tmp_grps$x_grps <- df_tmp_grps %>% apply(1,paste0, collapse="_")
 	mat_pairs <- combn(df_tmp_grps$x_grps, 2)
 	df_rst <- apply(mat_pairs,2,function(y) {
 		var1 <- y[1]
 		var2 <- y[2]
-		rst <- wilcox.test(df_tmp$pi_n_pi_s[df_tmp$Vaccine==df_tmp_grps$Vaccine[df_tmp_grps$x_grps==var1] & df_tmp$lineage_sim==df_tmp_grps$lineage_sim[df_tmp_grps$x_grps==var1]], df_tmp$pi_n_pi_s[df_tmp$Vaccine==df_tmp_grps$Vaccine[df_tmp_grps$x_grps==var2] & df_tmp$lineage_sim==df_tmp_grps$lineage_sim[df_tmp_grps$x_grps==var2]])
-		tibble(var1=var1, var2=var2, p_value=rst$p.value)
+		value1 <- df_tmp$n_per_kb[df_tmp$Vaccine==df_tmp_grps$Vaccine[df_tmp_grps$x_grps==var1] & df_tmp$lineage_sim==df_tmp_grps$lineage_sim[df_tmp_grps$x_grps==var1]]
+		value2 <- df_tmp$n_per_kb[df_tmp$Vaccine==df_tmp_grps$Vaccine[df_tmp_grps$x_grps==var2] & df_tmp$lineage_sim==df_tmp_grps$lineage_sim[df_tmp_grps$x_grps==var2]]
+		rst <- wilcox.test(value1, value2)
+		tibble(var1=var1, var2=var2, var1_mean=mean(value1,na.rm=T), var2_mean=mean(value2,na.rm=T), median_var1=median(value1,na.rm=T), median_var2=median(value2,na.rm=T), p_value=rst$p.value)
 	})
 	df_rst <- bind_rows(df_rst)
-	bind_cols(df_tmp %>% select(gene) %>% unique(), df_rst)	
+	df_rst <- bind_cols(df_tmp %>% select(gene) %>% unique(), df_rst)	
+	df_rst %>% arrange(p_value)
 })
 df_wilc_test <- bind_rows(df_wilc_test)
 df_wilc_test %>% filter(p_value<0.05) # four pairs of comparision are significant (P<0.05)
-write_csv(df_wilc_test %>% filter(p_value<0.05), "../results/df_test_num_isnvs_by_vaccine_gene.csv")
-
-
+write_csv(df_wilc_test , "../results/df_test_num_isnvs_by_vaccine_gene.csv")
 
 ### Allele frequency of iSNV mutations 
 ggplot(df_plot, aes(x=Vaccine, y=sec_freq, color=lineage_sim))+ # freq of isnvs
@@ -354,12 +291,134 @@ ggplot(df_plot, aes(x=Vaccine, y=sec_freq, color=lineage_sim))+ # freq of isnvs
 	xlab("Group")+
 	theme_classic()+
 	NULL
+ggsave("../results/Freq_isnvs_by_vaccine.pdf")
 
 wilcox.test(df_plot$sec_freq[df_plot$Vaccine=="Non-vaccinated" & df_plot$lineage_sim=="Delta"], df_plot$sec_freq[df_plot$Vaccine=="BioNTech"])
 wilcox.test(df_plot$sec_freq[df_plot$Vaccine=="Non-vaccinated" & df_plot$lineage_sim=="Delta"], df_plot$sec_freq[df_plot$Vaccine=="Sinovac"]) # Vac Sinovac Delta and Unvac Delta
-wilcox.test(df_plot$sec_freq[df_plot$Vaccine=="Non-vaccinated" & df_plot$lineage_sim=="Delta"], df_plot$sec_freq[df_plot$Vaccine!="Non-vaccinated" & df_plot$lineage_sim=="Delta"]) 
+
+### Diversity of samples
+#### we use nucleotide diversity pi here (Ref: https://academic.oup.com/ve/article/5/1/vey041/5304643, https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4316684/)
+source("./helper/cal_nu_diveristy_pi.r")
+df_orf_sim <- read_csv("../data/ORF_SCoV2_sim.csv")
+# all(unique(df_plot$gene) %in% df_orf_sim$sequence)
+
+list_samples <- df_plot$sample %>% unique()
+mclapply(list_samples, function(sample_t) {
+	print(sample_t)
+	# sample_t <- list_samples[1]
+	df_mut_t <- df_plot %>% filter(sample==sample_t)
+	Generate_cvf_files(df_mut_t)
+	run_snpgenie(sample_t)
+}, mc.cores=8)
+
+df_diveristy_pop <-  read_snpgenie_rst(list.files("../results/snpgenie/", pattern="population_summary", recursive=T, full.names=T))
+df_bam_t <- df_bam_rst %>% filter(reads_pp>=100) %>% group_by(sample) %>% summarise(n=n())
+df_diveristy_pop$sample <- gsub("\\.vcf", "", df_diveristy_pop$file)
+df_diveristy_pop <- left_join(df_diveristy_pop, df_bam_t, "sample")
+df_diveristy_pop$scale_fct <- 29903/df_diveristy_pop$n # scale
+df_diveristy_pop <- left_join(df_diveristy_pop, df_plot %>% select(lineage_sim, sample, Vaccine) %>% unique(), "sample")
+df_diveristy_pop <- bind_cols(df_diveristy_pop %>% select(!contains("pi")), df_diveristy_pop %>% select(contains("pi")) %>% mutate_all(as.numeric))
+df_diveristy_pop$pi_scale <- df_diveristy_pop$pi*df_diveristy_pop$scale_fct
+
+df_gene_div <-  read_snpgenie_rst(list.files("../results/snpgenie/", pattern="product", recursive=T, full.names=T))
+df_scale_gene <- lapply(seq_len(nrow(df_orf_sim)), function(i) {
+	# print(i)
+	gene_i <- df_orf_sim$sequence[i]
+	start_i <- df_orf_sim$start[i]
+	stop_i <- df_orf_sim$stop[i]
+	df_bam_rst %>% filter(reads_pp>=100) %>% filter(pos>=start_i & pos<=stop_i) %>% group_by(sample) %>% summarise(n=n()) %>% mutate(gene=gene_i, scale_fct=(stop_i-start_i+1)/n)
+})
+df_scale_gene <- bind_rows(df_scale_gene)
+df_gene_div$gene <- gsub("gene-", "", df_gene_div$product)
+df_gene_div$gene <- gsub("orf", "ORF", df_gene_div$gene)
+df_gene_div$sample <- gsub("\\.vcf", "", df_gene_div$file)
+df_gene_div <- left_join(df_gene_div, df_scale_gene, by=c("gene", "sample"))
+df_gene_div <- left_join(df_gene_div, df_plot %>% select(lineage_sim, sample, Vaccine) %>% unique(), "sample")
+df_gene_div <- bind_cols(df_gene_div %>% select(!contains("pi")), df_gene_div %>% select(contains("pi")) %>% mutate_all(as.numeric))
+df_gene_div$pi <- (as.numeric(df_gene_div$N_diffs) + as.numeric(df_gene_div$S_diffs))/(as.numeric(df_gene_div$N_sites) + as.numeric(df_gene_div$S_sites))
+df_gene_div$pi_scale <- df_gene_div$pi*df_gene_div$scale_fct
+
+# plot for pi
+df_diveristy_pop$gene <- "Full genome"
+df_plot_pi <- bind_rows(df_gene_div, df_diveristy_pop)
+
+ggplot(df_plot_pi %>% filter(gene %in% c("Full genome", "ORF1ab", "S")), aes(x=`Vaccine`, y=pi_scale, color=lineage_sim))+ # mutation rate
+	geom_point(alpha=0.8, position=position_jitterdodge(jitter.width=0.1))+
+	geom_boxplot(outlier.size=0, outlier.alpha=0, alpha=0.8)+
+	facet_grid(rows=vars(gene))+
+	# ylab(expression(pi[N]~"/"~pi["S"]))+
+	ylab(expression("Nucleotide diversity"~pi))+
+	xlab("Group")+
+	scale_color_manual(name="Lineage", values=colors_lineage)+
+	theme_classic()+
+	# theme_minimal()+
+	NULL
+ggsave("../results/diveristy_pi_gene.pdf", width=8, height=6)
+
+df_groups <- df_plot_pi %>% filter(gene %in% c("Full genome", "ORF1ab", "S")) %>% select(gene) %>% unique() 
+df_wilc_test <- lapply(seq_len(nrow(df_groups)), function(i) {
+	df_tmp <- df_plot_pi %>% filter(gene==df_groups$gene[i])
+	df_tmp_grps <- df_tmp %>% select(Vaccine, lineage_sim) %>% unique()
+	df_tmp_grps$x_grps <- df_tmp_grps %>% apply(1,paste0, collapse="_")
+	mat_pairs <- combn(df_tmp_grps$x_grps, 2)
+	df_rst <- apply(mat_pairs,2,function(y) {
+		var1 <- y[1]
+		var2 <- y[2]
+		value1 <- df_tmp$pi_scale[df_tmp$Vaccine==df_tmp_grps$Vaccine[df_tmp_grps$x_grps==var1] & df_tmp$lineage_sim==df_tmp_grps$lineage_sim[df_tmp_grps$x_grps==var1]]
+		value2 <- df_tmp$pi_scale[df_tmp$Vaccine==df_tmp_grps$Vaccine[df_tmp_grps$x_grps==var2] & df_tmp$lineage_sim==df_tmp_grps$lineage_sim[df_tmp_grps$x_grps==var2]]
+		rst <- wilcox.test(value1, value2)
+		tibble(var1=var1, var2=var2, var1_mean=mean(value1,na.rm=T), var2_mean=mean(value2,na.rm=T), median_var1=median(value1,na.rm=T), median_var2=median(value2,na.rm=T), p_value=rst$p.value)
+	})
+	df_rst <- bind_rows(df_rst)
+	df_rst <- bind_cols(df_tmp %>% select(gene) %>% unique(), df_rst)	
+	df_rst %>% arrange(p_value)
+})
+df_wilc_test <- bind_rows(df_wilc_test)
+df_wilc_test %>% filter(p_value<0.05) # four pairs of comparision are significant (P<0.05)
+write_csv(df_wilc_test , "../results/df_test_diversity_pi_by_vaccine_gene.csv")
+
+# plot for piN_piS
+df_gene_div$piN_piS <- df_gene_div$piN/df_gene_div$piS
+df_diveristy_pop$piN_piS <- df_diveristy_pop$piN/df_diveristy_pop$piS
+df_plot_pi <- bind_rows(df_gene_div, df_diveristy_pop)
+ggplot(df_plot_pi %>% filter(gene %in% c("Full genome", "ORF1ab", "S")), aes(x=`Vaccine`, y=piN_piS, color=lineage_sim))+ # mutation rate
+	geom_point(alpha=0.8, position=position_jitterdodge(jitter.width=0.1))+
+	geom_boxplot(outlier.size=0, outlier.alpha=0, alpha=0.8)+
+	facet_grid(rows=vars(gene))+
+	ylab(expression(pi[N]~"/"~pi["S"]))+
+	xlab("Group")+
+	scale_color_manual(name="Lineage", values=colors_lineage)+
+	theme_classic()+
+	# theme_minimal()+
+	NULL
+ggsave("../results/diveristy_piN_piS_gene.pdf", width=8, height=6)
+save_pptx("../results/diveristy_piN_piS_gene.pptx", width=8, height=6)
+
+df_groups <- df_plot_pi %>% filter(gene %in% c("Full genome", "ORF1ab", "S")) %>% select(gene) %>% unique() 
+df_wilc_test <- lapply(seq_len(nrow(df_groups)), function(i) {
+	df_tmp <- df_plot_pi %>% filter(gene==df_groups$gene[i])
+	df_tmp_grps <- df_tmp %>% select(Vaccine, lineage_sim) %>% unique()
+	df_tmp_grps$x_grps <- df_tmp_grps %>% apply(1,paste0, collapse="_")
+	mat_pairs <- combn(df_tmp_grps$x_grps, 2)
+	df_rst <- apply(mat_pairs,2,function(y) {
+		var1 <- y[1]
+		var2 <- y[2]
+		value1 <- df_tmp$piN_piS[df_tmp$Vaccine==df_tmp_grps$Vaccine[df_tmp_grps$x_grps==var1] & df_tmp$lineage_sim==df_tmp_grps$lineage_sim[df_tmp_grps$x_grps==var1]]
+		value2 <- df_tmp$piN_piS[df_tmp$Vaccine==df_tmp_grps$Vaccine[df_tmp_grps$x_grps==var2] & df_tmp$lineage_sim==df_tmp_grps$lineage_sim[df_tmp_grps$x_grps==var2]]
+		rst <- wilcox.test(value1, value2)
+		tibble(var1=var1, var2=var2, var1_mean=mean(value1,na.rm=T), var2_mean=mean(value2,na.rm=T), median_var1=median(value1,na.rm=T), median_var2=median(value2,na.rm=T), p_value=rst$p.value)
+	})
+	df_rst <- bind_rows(df_rst)
+	df_rst <- bind_cols(df_tmp %>% select(gene) %>% unique(), df_rst)	
+	df_rst %>% arrange(p_value)
+})
+df_wilc_test <- bind_rows(df_wilc_test)
+df_wilc_test %>% filter(p_value<0.05) # four pairs of comparision are significant (P<0.05)
+write_csv(df_wilc_test, "../results/df_test_diversity_piN_piS_by_vaccine_gene.csv")
 
 #### Which gene
+df_epitope <- readxl::read_excel("../data/df_t_cell_epitope.xlsx")
+df_epitope$found_in <- sapply(strsplit(df_epitope$`Reference(s)*`, ", "), length)
 source("./helper/annotate_gene.r")
 
 df_plot$effect_sim <- df_plot$effect
@@ -371,6 +430,7 @@ table(df_plot$effect_sim)
 df_plot <- bind_cols(df_plot, get_orf(df_plot$X2))
 
 ##### annotate epitope
+# TODO
 table(df_plot$gene, df_plot$gene_nsp)
 
 lapply(seq_len(nrow(df_plot)), function(i) {

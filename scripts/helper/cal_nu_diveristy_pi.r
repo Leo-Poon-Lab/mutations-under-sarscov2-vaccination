@@ -28,3 +28,37 @@ Cal_pi <- function(dls, length_genome) {
 
 # Broadly speaking, excess nonsynonymous polymorphism (πN/πS > 1) points toward diversifying or positive selection while excess synonymous polymorphism (πN/πS < 1) indicates purifying selection. When πN / πS is approximately 1, genetic drift, i.e., stochastic changes in the frequency of viral genotypes over time, can be an important force shaping genetic diversity. (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7946358/)
 
+# The below scripts use SNPGenie for calculation of pi
+dir.create("../results/snpgenie/")
+Generate_cvf_files <- function(df_mut_t) {
+	df_vcf <- tibble('#CHROM' = "MN908947.3", POS=df_mut_t$X2)
+	df_vcf$ID <- "."
+	df_vcf$REF <- df_mut_t$X4
+	df_vcf$ALT <- df_mut_t$X5
+	df_vcf$QUAL <- 30
+	df_vcf$FILTER <- "PASS"
+	df_vcf$INFO <- paste0("DP=", df_mut_t$con_fwd+df_mut_t$con_rev+df_mut_t$sec_fwd+df_mut_t$sec_rev, ";", "AF=", df_mut_t$sec_freq)
+	# df_vcf$FORMAT <- 
+	sample_name_t <- df_mut_t$sample[1]
+	df_vcf$`<SAMPLE>` <- sample_name_t
+	dir.create(paste0("../results/snpgenie/", sample_name_t))
+	write_tsv(df_vcf, paste0("../results/snpgenie/", sample_name_t, "/", sample_name_t, ".vcf"))	
+}
+
+run_snpgenie <- function(sample_name_t) {
+	file.copy("../data/reference.fasta", paste0("../results/snpgenie/", sample_name_t, "/reference.fasta"), overwrite=T)
+	file.copy("../data/SCoV2_genes.gtf", paste0("../results/snpgenie/", sample_name_t, "/SCoV2_genes.gtf"), overwrite=T)	
+	cur_wd <- getwd()
+	setwd(paste0("../results/snpgenie/", sample_name_t))
+	system("rm -r SNPGenie_Results")
+	system("~/softwares/SNPGenie/snpgenie.pl --vcfformat=2")
+	setwd(cur_wd)
+}
+
+read_snpgenie_rst <- function(files) {
+	tmp <- lapply(files, read_tsv, col_types=cols(.default = "c"))
+	bind_rows(tmp)
+}
+
+
+# perl snpgenie.pl --vcfformat=4 --snpreport='/Volumes/GoogleDrive/Shared drives/2019-nCoV open research team/Sequencing Data/Cats/SARSCoV2_transmission_in_domestic_cats/data_derived/1_2A.vcf.recode.vcf' --fastafile='/Volumes/GoogleDrive/Shared drives/2019-nCoV open research team/Sequencing Data/Cats/SARSCoV2_transmission_in_domestic_cats/MW219695.1/MW219695.1.fasta' --gtffile='/Volumes/GoogleDrive/Shared drives/2019-nCoV open research team/Sequencing Data/Cats/SARSCoV2_transmission_in_domestic_cats/MW219695.1/genes.gtf' --o='/Volumes/GoogleDrive/Shared drives/2019-nCoV open research team/Sequencing Data/Cats/SARSCoV2_transmission_in_domestic_cats/data_derived/diversity/1_2A'
