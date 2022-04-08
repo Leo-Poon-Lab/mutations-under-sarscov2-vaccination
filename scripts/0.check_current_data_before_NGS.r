@@ -1,6 +1,5 @@
 library(tidyverse)
 library(readxl)
-library(ssh.utils)
 
 data_cov <- read_csv("../../../2020/2020-09-01_COVID_NGS_pipeline/COVID_NGS_pipeline_results_shared/coverage.csv")
 df_choose <- read_excel("../data/Vaccine Delta SNP list.xlsx", skip=1)

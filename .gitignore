@@ -1,2 +1,5 @@
 /data/*
 /results/*
+/draft/*
+*.zip
+.DS_Store
