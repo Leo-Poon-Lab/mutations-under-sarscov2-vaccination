@@ -17,19 +17,16 @@ process_pysamstats <- function(file_input){
 	})
 }
 
-read_pysamstats <- function(files_bam_rst_full) {
-	df_bam_rst <- lapply(files_bam_rst_full, function(x){
-		print(x)
-		tmp <- read_tsv(x)
-		sample_x <- strsplit(x, "/", fixed=T)[[1]]
-		sample_x <- sample_x[length(sample_x)]
-		sample_x <- gsub(".tsv", "", sample_x, fixed=T)
-		tmp$sample <- sample_x
-		return(tmp)
-	})
-	df_bam_rst <- bind_rows(df_bam_rst)
-	# df_bam_rst <- df_bam_rst %>% filter(reads_pp>=100)
-	# n_high_depth <- nrow(df_bam_rst)
-	# if(n_high_depth>=27000){return(df_bam_rst)} else{return(NA)}
+read_pysamstats <- function(x, pp=TRUE) {
+	print(x)
+	if(pp){
+		df_bam_rst <- read_tsv(x) %>% select(pos, contains("_pp"))
+	} else {
+		df_bam_rst <- read_tsv(x) %>% select(pos, !contains("_pp"))
+	}
+	sample_x <- strsplit(x, "/", fixed=T)[[1]]
+	sample_x <- sample_x[length(sample_x)]
+	sample_x <- gsub(".tsv", "", sample_x, fixed=T)
+	df_bam_rst$sample <- sample_x
+	if(sum(df_bam_rst$reads_all>=100)>=27000){return(df_bam_rst)} else{return(NA)}
 }
-

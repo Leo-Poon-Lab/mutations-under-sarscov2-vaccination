@@ -35,8 +35,8 @@ annotate_snpeff <- function(files_vcf){
 	})
 }
 
-read_snpeff <- function(files_snpeff_csv, mc.cores=16) {
-	df_tmp <- mclapply(files_snpeff_csv, function(x) {
+read_snpeff <- function(files_snpeff_csv, mc.cores=8) {
+	df_tmp <- lapply(files_snpeff_csv, function(x) {
 		print(x)
 		df_tmp <- read_csv(x)
 		sample_t <- strsplit(gsub("\\.tsv$", "", x), "/", fixed=T)[[1]]
@@ -44,6 +44,6 @@ read_snpeff <- function(files_snpeff_csv, mc.cores=16) {
 		sample_sim_t <- strsplit(sample_t, ".", fixed=T)[[1]][1]
 		df_tmp$sample <- gsub("ivar_", "", sample_sim_t)
 		return(df_tmp)
-	}, mc.cores=mc.cores)
+	})
 	return(bind_rows(df_tmp))
 }

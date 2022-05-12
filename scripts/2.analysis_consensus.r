@@ -69,21 +69,3 @@ system(paste0("mafft --auto --maxiterate 1000 --thread 8 --keeplength --addfragm
 system(paste0("pangolin ", file_seq_aln, " --outfile ../results/lineage.csv")) 
 seq_aln <- readDNAStringSet("../results/seqs_aln.fasta")
 
-# # filter high-coverage
-# df_lin <- read_csv("../results/lineage.csv")
-# cov_check_raw <- apply(alphabetFrequency(seq_aln), 1, function(x){
-# 	sum(x[1:4])
-# })
-# cov_check <- round(cov_check_raw/29903*100, 2)
-# names(cov_check) <- names(seq_aln)
-# head(sort(cov_check))
-# seq_aln_hq <- seq_aln[cov_check_raw>27000]
-# seq_aln_hq <- c(seq_aln_hq)
-# samples_hq <- sapply(names(seq_aln_hq), function(x){
-# 	tmp <- strsplit(x, "_")[[1]]
-# 	tmp[grepl("WHP", tmp)]
-# })
-# samples_hq <- unlist(samples_hq)
-# writeXStringSet(seq_aln_hq, "../results/seqs_aln_hq.fasta")
-# writeLines(samples_hq, "../results/samples_hq.txt")
-

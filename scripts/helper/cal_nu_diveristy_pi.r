@@ -41,23 +41,29 @@ Generate_cvf_files <- function(df_mut_t) {
 	# df_vcf$FORMAT <- 
 	sample_name_t <- df_mut_t$sample[1]
 	df_vcf$`<SAMPLE>` <- sample_name_t
-	dir.create(paste0("../results/snpgenie/", sample_name_t))
-	write_tsv(df_vcf, paste0("../results/snpgenie/", sample_name_t, "/", sample_name_t, ".vcf"))	
+	df_vcf
 }
 
-run_snpgenie <- function(sample_name_t) {
+prepare_snpgenie <- function(sample_name_t) {
 	file.copy("../data/reference.fasta", paste0("../results/snpgenie/", sample_name_t, "/reference.fasta"), overwrite=T)
 	file.copy("../data/SCoV2_genes.gtf", paste0("../results/snpgenie/", sample_name_t, "/SCoV2_genes.gtf"), overwrite=T)	
 	cur_wd <- getwd()
 	setwd(paste0("../results/snpgenie/", sample_name_t))
 	system("rm -r SNPGenie_Results")
-	system("~/softwares/SNPGenie/snpgenie.pl --vcfformat=2")
+	# system("~/softwares/SNPGenie/snpgenie.pl --vcfformat=2")
 	setwd(cur_wd)
 }
 
 read_snpgenie_rst <- function(files) {
-	tmp <- lapply(files, read_tsv, col_types=cols(.default = "c"))
-	bind_rows(tmp)
+	header_tmp <- read_tsv(files[1], col_types=cols(.default = "c")) %>% names()
+	read_tsv_self <- function(x){
+		tmp <- read_tsv(x, col_types=cols(.default = "c"), col_names=F)
+		tmp %>% filter(X1!="file") %>% filter(!grepl("^temp", X1))
+	}
+	tmp_all <- lapply(files, read_tsv_self)
+	tmp_all <- bind_rows(tmp_all) 
+	names(tmp_all) <- header_tmp
+	tmp_all
 }
 
 
