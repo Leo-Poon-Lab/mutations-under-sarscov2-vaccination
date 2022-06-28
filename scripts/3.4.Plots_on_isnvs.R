@@ -6,6 +6,7 @@ library(parallel)
 library(lubridate)
 library(writexl)
 library(ggpubr)
+library(ggsignif)
 source("https://raw.githubusercontent.com/Koohoko/Save-ggplot-to-pptx/main/scripts/save_pptx.r")
 source('./helper/plot_box.R')
 source("./helper/df_test.R")
@@ -40,25 +41,25 @@ df_plot_n_gene_meta_adj$Vaccine <- factor(df_plot_n_gene_meta_adj$Vaccine, level
 df_snvs_meta_add_qc$Vaccine <- factor(df_snvs_meta_add_qc$Vaccine, levels=names(colors_vaccine), labels=names(colors_vaccine_new))
 
 ## plot for incidence
-p1_1_ori <- plot_box(df_plot=df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x_var="Vaccine", y_var="n_per_kb", color_var="lineage_sim", y_lab="Number of iSNVs per Kb")
+p1_1_ori <- plot_box(df_plot=df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x_var="Vaccine", y_var="n_per_kb", color_var="lineage_sim", y_lab="Number of iSNVs per Kb", x_lab="Vaccine")
 p1_1_ori <- p1_1_ori + scale_color_manual(name="Lineage", values=colors_lineage)
-p1_1 <- plot_box(df_plot=df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x_var="Vaccine", y_var="n_per_kb_adj", color_var="lineage_sim", y_lab="Number of iSNVs per Kb (adjusted)")
+p1_1 <- plot_box(df_plot=df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x_var="Vaccine", y_var="n_per_kb_adj", color_var="lineage_sim", y_lab="Number of iSNVs per Kb (adjusted)", x_lab="Vaccine")
 p1_1 <- p1_1 + scale_color_manual(name="Lineage", values=colors_lineage)
 p_out <- p1_1_ori/p1_1 + plot_layout(guides='collect')
 ggsave("../results/Num_isnvs_by_vaccine_more.pdf", width=6, height=6)
 save_pptx("../results/Num_isnvs_by_vaccine_more.pptx", width=6, height=6)
 
-p1_2 <- plot_box(df_plot=df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x_var="lineage_sim", y_var="n_per_kb_adj", color_var="Vaccine", y_lab="Number of iSNVs per Kb (adjusted)")
+p1_2 <- plot_box(df_plot=df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x_var="lineage_sim", y_var="n_per_kb_adj", color_var="Vaccine", y_lab="Number of iSNVs per Kb (adjusted)", x_lab="Lineage")
 p1_2 <- p1_2 + scale_color_manual(name="Vaccine", values=colors_vaccine_new)
 ggsave("../results/Num_isnvs_by_vaccine_2_more.pdf", width=6, height=4)
 save_pptx("../results/Num_isnvs_by_vaccine_2_more.pptx", width=6, height=4)
 
-p1_3 <- plot_box(df_plot_n_gene_meta_adj %>% filter(gene %in% c("ORF1ab", "S")), x_var="Vaccine", y_var="n_per_kb_adj", color_var="lineage_sim", y_lab="Number of iSNVs per Kb (adjusted)")
+p1_3 <- plot_box(df_plot_n_gene_meta_adj %>% filter(gene %in% c("ORF1ab", "S")), x_var="Vaccine", y_var="n_per_kb_adj", color_var="lineage_sim", y_lab="Number of iSNVs per Kb (adjusted)", x_lab="Vaccine")
 p1_3 <- p1_3 + scale_color_manual(name="Lineage", values=colors_lineage)+ facet_grid(rows=vars(gene))
 ggsave("../results/Num_isnvs_by_vaccine_gene_more.pdf", width=8, height=6)
 save_pptx("../results/Num_isnvs_by_vaccine_gene_more.pptx", width=8, height=6)
 
-p1_4 <- plot_box(df_plot_n_gene_meta_adj %>% filter(gene %in% c("ORF1ab", "S")), x_var="lineage_sim", y_var="n_per_kb_adj", color_var="Vaccine", y_lab="Number of iSNVs per Kb (adjusted)")
+p1_4 <- plot_box(df_plot_n_gene_meta_adj %>% filter(gene %in% c("ORF1ab", "S")), x_var="lineage_sim", y_var="n_per_kb_adj", color_var="Vaccine", y_lab="Number of iSNVs per Kb (adjusted)", x_lab="Lineage")
 p1_4 <- p1_4 + scale_color_manual(name="Vaccine", values=colors_vaccine_new)+facet_grid(rows=vars(gene))
 ggsave("../results/Num_isnvs_by_vaccine_gene_2_more.pdf", width=8, height=6)
 save_pptx("../results/Num_isnvs_by_vaccine_gene_2_more.pptx", width=8, height=6)
@@ -96,22 +97,22 @@ ggsave("../results/Density_isnvs_by_vaccine_more.pdf", width=8, height=6)
 save_pptx("../results/Density_isnvs_by_vaccine_more.pptx", width=8, height=6)
 
 ## plot for MAF
-p2_1 <- plot_box(df_snvs_meta_add_qc %>% filter(gene=="Full genome"), x_var="Vaccine", y_var="sec_freq", color_var="lineage_sim", y_lab="MAF (adjusted)")
+p2_1 <- plot_box(df_snvs_meta_add_qc %>% filter(gene=="Full genome"), x_var="Vaccine", y_var="sec_freq", color_var="lineage_sim", y_lab="MAF", x_lab="Vaccine")
 p2_1 <- p2_1 + scale_color_manual(name="Lineage", values=colors_lineage)
 ggsave("../results/MAF_more.pdf", width=8, height=6)
 save_pptx("../results/MAF_more.pptx", width=8, height=6)
 
-p2_2 <- plot_box(df_snvs_meta_add_qc %>% filter(gene=="Full genome"), x_var="lineage_sim", y_var="sec_freq", color_var="Vaccine", y_lab="MAF (adjusted)")
+p2_2 <- plot_box(df_snvs_meta_add_qc %>% filter(gene=="Full genome"), x_var="lineage_sim", y_var="sec_freq", color_var="Vaccine", y_lab="MAF", x_lab="Lineage")
 p2_2 <- p2_2 + scale_color_manual(name="Vaccine", values=colors_vaccine_new)
 ggsave("../results/MAF_2_more.pdf", width=8, height=6)
 save_pptx("../results/MAF_2_more.pptx", width=8, height=6)
 
-p2_3 <- plot_box(df_snvs_meta_add_qc %>% filter(gene %in% c("ORF1ab", "S")), x_var="Vaccine", y_var="sec_freq", color_var="lineage_sim", y_lab="MAF (adjusted)")
+p2_3 <- plot_box(df_snvs_meta_add_qc %>% filter(gene %in% c("ORF1ab", "S")), x_var="Vaccine", y_var="sec_freq", color_var="lineage_sim", y_lab="MAF", x_lab="Vaccine")
 p2_3 <- p2_3 + scale_color_manual(name="Lineage", values=colors_lineage)+facet_grid(rows=vars(gene))
 ggsave("../results/MAF_gene_more.pdf", width=8, height=6)
 save_pptx("../results/MAF_gene_more.pptx", width=8, height=6)
 
-p2_4 <- plot_box(df_snvs_meta_add_qc %>% filter(gene %in% c("ORF1ab", "S")), x_var="lineage_sim", y_var="sec_freq", color_var="Vaccine", y_lab="MAF (adjusted)")
+p2_4 <- plot_box(df_snvs_meta_add_qc %>% filter(gene %in% c("ORF1ab", "S")), x_var="lineage_sim", y_var="sec_freq", color_var="Vaccine", y_lab="MAF", x_lab="Lineage")
 p2_4 <- p2_4 + scale_color_manual(name="Vaccine", values=colors_vaccine_new)+
 	facet_grid(rows=vars(gene))
 ggsave("../results/MAF_gene_2_more.pdf", width=8, height=6)
@@ -131,12 +132,12 @@ mean(df_plot_pi$piS, na.rm=T)
 # boxplot(df_plot_pi$piN-df_plot_pi$piS)
 wilcox.test(df_plot_pi$piN-df_plot_pi$piS)
 
-p3_1 <- plot_box(df_plot_pi, x_var="Vaccine", y_var="pi", color_var="lineage_sim", y_lab=expression("Nucleotide diversity ("~pi~")"))
+p3_1 <- plot_box(df_plot_pi, x_var="Vaccine", y_var="pi", color_var="lineage_sim", y_lab=expression("Nucleotide diversity ("~pi~")"), x_lab="Vaccine")
 p3_1 <- p3_1 + scale_color_manual(name="Lineage", values=colors_lineage)
 ggsave("../results/diveristy_pi_more.pdf", width=8, height=6)
 save_pptx("../results/diveristy_pi_more.pptx", width=8, height=6)
 
-p3_2 <- plot_box(df_plot_pi, x_var="lineage_sim", y_var="pi", color_var="Vaccine", y_lab=expression("Nucleotide diversity ("~pi~")"))
+p3_2 <- plot_box(df_plot_pi, x_var="lineage_sim", y_var="pi", color_var="Vaccine", y_lab=expression("Nucleotide diversity ("~pi~")"), x_lab="Lineage")
 p3_2 <- p3_2 + scale_color_manual(name="Vaccine", values=colors_vaccine_new)
 ggsave("../results/diveristy_pi_2_more.pdf", width=8, height=6)
 save_pptx("../results/diveristy_pi_2_more.pptx", width=8, height=6)
@@ -158,8 +159,24 @@ df_wilc_test <- highlight_diff(df_wilc_test)
 write_xlsx(df_wilc_test, "../results/df_test_diversity_pi_by_vaccine_gene_more.xlsx")
 
 ### combine figures
-p_out_1 <- (p1_1+ggtitle("A")) + (p2_1+ggtitle("B")) + (p3_1+ggtitle("C")) + plot_layout(ncol=1, guides="collect") & theme(legend.position='bottom')
-p_out_2 <- (p1_2+ggtitle("D")) + (p2_2+ggtitle("E")) + (p3_2+ggtitle("F")) + plot_layout(ncol=1, guides="collect") & theme(legend.position='bottom')
+p1_1_p <- p1_1+
+   ggtitle("A")+
+   geom_signif(y_position = 0.55+seq(0,5)/20, xmin = c(0.8,2.8,2.8,2.8,2.9,3.1), xmax = c(1.2,3.1,3.2,3.3,3.3,3.3), annotation = c("**","*","**","*","**","*"), color="black", vjust=0.65, tip_length = 0.01)
+p1_2_p <- p1_2+
+   ggtitle("D")+
+   geom_signif(y_position = 0.6+seq(0,0)/20, xmin = c(1.8), xmax = c(2.2), annotation = "*", color="black", vjust=0.65, tip_length = 0.01)
+
+p3_1_p <- p3_1+
+   ggtitle("C")+
+   geom_signif(y_position = (0.5+seq(0,5)/20)/2000, xmin = c(2.7,2.8,2.8,2.8,2.9,3.1), xmax = c(3.3,3.1,3.2,3.3,3.3,3.3), annotation = c("*","**","*","**","**","**"), color="black", vjust=0.65, tip_length = 0.01)+
+   geom_signif(y_position = (0.5+seq(0,0)/20)/2000, xmin = c(0.8), xmax = c(1.2), annotation = "P=0.068", color="black", vjust=-0.5, tip_length = 0.01,textsize=2.3)
+
+p3_2_p <- p1_2+
+   ggtitle("F")+
+   geom_signif(y_position = 0.6+seq(0,0)/20, xmin = c(1.8), xmax = c(2.2), annotation = "P=0.088", color="black", vjust=-0.5, tip_length = 0.01,textsize=2.3)
+
+p_out_1 <- (p1_1_p) + (p2_1+ggtitle("B")) + (p3_1_p) + plot_layout(ncol=1, guides="collect") & theme(legend.position='bottom')
+p_out_2 <- (p1_2_p) + (p2_2+ggtitle("E")) + (p3_2_p) + plot_layout(ncol=1, guides="collect") & theme(legend.position='bottom')
 p_out <- p_out_1 | p_out_2
 ggsave("../results/plot_comb_by_variant_full_more.pdf", width=10, height=8)
 save_pptx("../results/plot_comb_by_variant_full_more.pptx", width=8, height=8)

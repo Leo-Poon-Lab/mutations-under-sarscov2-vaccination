@@ -86,6 +86,9 @@ p_n_sharing <- ggplot(df_tmp) +
 
 ## sequencing depth
 unique(df_bam_rst$sample)
+tmp <- df_bam_rst %>% group_by(sample) %>% summarise(meadian_depth=median(reads_all)) %>% .$meadian_depth
+range(tmp)
+
 df_rc_slide <- df_bam_rst %>% group_by(sample) %>% summarise(slide_depth = slide_mean(reads_all, before=200), pos=pos) %>% filter(pos%%50==0)
 df_rc_bind_mean <- df_rc_slide %>% group_by(pos) %>% summarise(mean_depth=mean(slide_depth))
 
@@ -322,6 +325,7 @@ df_snvs_meta_add_qc_adj <- add_residuals(bind_rows(df_snvs_meta_add_qc %>% mutat
 save(df_plot_n_gene_meta_adj, file="../results/df_plot_n_gene_adj.rdata")
 
 ### Ct value
+load(file="../results/df_plot_n_gene_adj.rdata")
 p_pre <- ggscatter(df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x = "Ct_value", y = "n_per_kb",
    add = "reg.line",  # Add regressin line
    add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
@@ -344,28 +348,29 @@ p_aft <- ggscatter(df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x = 
    ylab("Number of iSNVs per Kb (adjusted)")+
    stat_cor(method = "pearson", label.x = 10, label.y = 1.3)+
    NULL
-# p_pre2 <- ggscatter(df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x = "detection_lag", y = "n_per_kb",
-#    add = "reg.line",  # Add regressin line
-#    add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
-#    alpha=0.8,
-#    size=0.8,
-#    conf.int = TRUE # Add confidence interval
-#    )+
-#    xlab("Detection lag (days)")+
-#    ylab("Number of iSNVs per Kb")+
-#    stat_cor(method = "pearson", label.x = 10, label.y = 1.3)+
-#    NULL
-# p_aft2 <- ggscatter(df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x = "detection_lag", y = "n_per_kb_adj",
-#    add = "reg.line",  # Add regressin line
-#    alpha=0.8,
-#    size=0.8,
-#    add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
-#    conf.int = TRUE # Add confidence interval
-#    )+
-#    xlab("Detection lag (days)")+
-#    ylab("Number of iSNVs per Kb (adjusted)")+
-#    stat_cor(method = "pearson", label.x = 10, label.y = 1.3)+
-#    NULL
+p_pre2 <- ggscatter(df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x = "detection_lag", y = "n_per_kb",
+   add = "reg.line",  # Add regressin line
+   add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
+   alpha=0.8,
+   size=0.8,
+   conf.int = TRUE # Add confidence interval
+   )+
+   xlab("Detection lag (days)")+
+   ylab("Number of iSNVs per Kb")+
+   stat_cor(method = "pearson", label.x = 10, label.y = 1.3)+
+   NULL
+ggsave("../results/detection_lag_vs_isnvs.pdf", plot=p_pre2)
+p_aft2 <- ggscatter(df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x = "detection_lag", y = "n_per_kb_adj",
+   add = "reg.line",  # Add regressin line
+   alpha=0.8,
+   size=0.8,
+   add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
+   conf.int = TRUE # Add confidence interval
+   )+
+   xlab("Detection lag (days)")+
+   ylab("Number of iSNVs per Kb (adjusted)")+
+   stat_cor(method = "pearson", label.x = 10, label.y = 1.3)+
+   NULL
 
 
 p_out_lag <- ggscatter(df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x = "Ct_value", y = "detection_lag",

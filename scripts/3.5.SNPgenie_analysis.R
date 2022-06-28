@@ -797,6 +797,7 @@ write_xlsx(intrahost_results_bootstrap_LONG, "../results/intrahost_allProductsby
 
 df_significance_label <- intrahost_results_bootstrap_LONG %>% group_by(outbreak) %>% mutate(group_max=max(d_SE_max)) %>% group_by(gene_name, outbreak) %>% summarise(significance_P=significance_P[1], d_SE_max = group_max*0.9, d_measure=d_measure[1])
 p_out <- intrahost_allProductsbygroup_PLOT + geom_text(aes(x=gene_name, y=d_SE_max * pi_corr_factor, label=significance_P), data=df_significance_label)
+p_out <- intrahost_allProductsbygroup_PLOT + geom_text(aes(x=gene_name, y=2.5, label=significance_P), data=df_significance_label)
 # SAVE PLOT
 ggsave(filename = "../results/intrahost_allProductsbygroup_PLOT.pdf", width = 6, height = 6*sqrt(2)-1, plot=p_out)
 save_pptx(file = "../results/intrahost_allProductsbygroup_PLOT.pptx", width = 6, height = 6*sqrt(2)-1,  plot=p_out)
@@ -841,6 +842,9 @@ ratio_direction_by_outbreak[! is.na(ratio_direction_by_outbreak$pos) & ratio_dir
 codon_results_byProductCodon$num_defined_seqs <- 6
 codon_results_byProductCodon$product <- codon_results_byProductCodon$product_segment
 # LOOP AND DO
+
+write_tsv(codon_results_byProductCodon, "../results/codon_results_byProductCodon.tsv")
+
 dir.create("../results/intrahost_sliding_windows/")
 system("chmod 755 ./SNPGenie_sliding_windows.R")
 mclapply(seq(10, 50, 10), function(size) {
