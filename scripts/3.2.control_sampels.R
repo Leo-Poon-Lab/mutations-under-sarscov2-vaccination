@@ -61,8 +61,8 @@ samples_pass_filter_case_id <- sapply(samples_pass_filter, function(x) {
 	data_meta_raw$case_id[tmp]
 })
 cases_have_duplicate <- table(samples_pass_filter_case_id)[table(samples_pass_filter_case_id)>1]
-length(samples_have_duplicate) # 86 cases have high quality replicates
-samples_high_quality <- unique(df_bam_rst$sample)[samples_pass_filter_case_id %in% names(samples_have_duplicate)] # 179 samples
+length(cases_have_duplicate) # 86 cases have high quality replicates
+samples_high_quality <- unique(df_bam_rst$sample)[samples_pass_filter_case_id %in% names(cases_have_duplicate)] # 179 samples
 
 df_bam_rst <- df_bam_rst %>% filter(sample %in% samples_high_quality)
 

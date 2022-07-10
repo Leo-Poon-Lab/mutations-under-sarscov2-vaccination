@@ -35,10 +35,10 @@ df_snvs_meta_add_qc$lineage_sim <- factor(df_snvs_meta_add_qc$lineage_sim, level
 df_snvs_meta_add_qc <- bind_rows(df_snvs_meta_add_qc %>% mutate(gene = "Full genome"), df_snvs_meta_add_qc)
 write_csv(df_snvs_meta_add_qc, "../results/df_snvs_meta_add_qc_ivar_clean.csv")
 
-
-# General plots
 df_plot_n_gene_meta_adj$Vaccine <- factor(df_plot_n_gene_meta_adj$Vaccine, levels=names(colors_vaccine), labels=names(colors_vaccine_new))
 df_snvs_meta_add_qc$Vaccine <- factor(df_snvs_meta_add_qc$Vaccine, levels=names(colors_vaccine), labels=names(colors_vaccine_new))
+
+# General plots
 
 ## plot for incidence
 p1_1_ori <- plot_box(df_plot=df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x_var="Vaccine", y_var="n_per_kb", color_var="lineage_sim", y_lab="Number of iSNVs per Kb", x_lab="Vaccine")
@@ -163,7 +163,6 @@ p1_1_p <- p1_1+
    ggtitle("A")+
    geom_signif(y_position = 0.55+seq(0,5)/20, xmin = c(0.8,2.8,2.8,2.8,2.9,3.1), xmax = c(1.2,3.1,3.2,3.3,3.3,3.3), annotation = c("**","*","**","*","**","*"), color="black", vjust=0.65, tip_length = 0.01)
 p1_2_p <- p1_2+
-   ggtitle("D")+
    geom_signif(y_position = 0.6+seq(0,0)/20, xmin = c(1.8), xmax = c(2.2), annotation = "*", color="black", vjust=0.65, tip_length = 0.01)
 
 p3_1_p <- p3_1+
@@ -172,14 +171,18 @@ p3_1_p <- p3_1+
    geom_signif(y_position = (0.5+seq(0,0)/20)/2000, xmin = c(0.8), xmax = c(1.2), annotation = "P=0.068", color="black", vjust=-0.5, tip_length = 0.01,textsize=2.3)
 
 p3_2_p <- p1_2+
-   ggtitle("F")+
    geom_signif(y_position = 0.6+seq(0,0)/20, xmin = c(1.8), xmax = c(2.2), annotation = "P=0.088", color="black", vjust=-0.5, tip_length = 0.01,textsize=2.3)
 
 p_out_1 <- (p1_1_p) + (p2_1+ggtitle("B")) + (p3_1_p) + plot_layout(ncol=1, guides="collect") & theme(legend.position='bottom')
-p_out_2 <- (p1_2_p) + (p2_2+ggtitle("E")) + (p3_2_p) + plot_layout(ncol=1, guides="collect") & theme(legend.position='bottom')
+p_out_2 <- (p1_2_p+ggtitle("D")) + (p2_2+ggtitle("E")) + (p3_2_p+ggtitle("F")) + plot_layout(ncol=1, guides="collect") & theme(legend.position='bottom')
 p_out <- p_out_1 | p_out_2
 ggsave("../results/plot_comb_by_variant_full_more.pdf", width=10, height=8)
 save_pptx("../results/plot_comb_by_variant_full_more.pptx", width=8, height=8)
+
+p_out_1 <- (p1_1_p) + (p2_1+ggtitle("B")) + (p3_1_p) + plot_layout(ncol=1, guides="collect") & theme(legend.position='right')
+ggsave("../results/Figure 2.pdf", width=8, height=8, plot= p_out_1)
+p_out_2 <- (p1_2_p+ggtitle("A")) + (p2_2+ggtitle("B")) + (p3_2_p+ggtitle("C")) + plot_layout(ncol=1, guides="collect") & theme(legend.position='right')
+ggsave("../results/Figure 2_supp.pdf", width=8, height=8, plot= p_out_2)
 
 
 
@@ -194,6 +197,8 @@ median(df_tmp$n_per_kb_adj[df_tmp$gene=="S"])
 wilcox.test(df_tmp$n_per_kb_adj[df_tmp$gene=="ORF1ab"], df_tmp$n_per_kb_adj[df_tmp$gene=="S"])
 
 df_tmp2 <- df_tmp %>% pivot_wider(names_from="gene", values_from="n_per_kb_adj")
+df_tmp2 <- left_join(df_tmp2, (df_tmp2 %>% group_by(lineage_sim) %>% summarise(n=n()) %>% mutate(lineage_sim_n=paste0(lineage_sim, " (N=", n, ")" )) %>% select(-n)))
+
 p_out <- ggscatter(df_tmp2, x = "ORF1ab", y = "S", color = "Vaccine",
    add = "reg.line",  # Add regressin line
    conf.int = TRUE, # Add confidence interval
@@ -202,7 +207,7 @@ p_out <- ggscatter(df_tmp2, x = "ORF1ab", y = "S", color = "Vaccine",
    scale_color_manual(name="Vaccine", values=colors_vaccine_new)+
    scale_fill_manual(name="Vaccine", values=colors_vaccine_new)+
    stat_cor(aes(color = Vaccine), label.x = 0.1)+
-   facet_wrap(vars(as.character(lineage_sim)),ncol=2)+
+   facet_wrap(vars(as.character(lineage_sim_n)),ncol=2)+
    NULL
 p_out <- p_out+geom_abline(intercept = 0, slope = 1, linetype="dashed")
 ggsave("../results/cor_isnvs_orf1ab_s.pdf", width=8, height=12)

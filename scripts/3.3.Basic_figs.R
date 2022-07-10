@@ -9,6 +9,7 @@ library(gggenes)
 library(ggpubr)
 library(boot)
 library(parallel)
+library(ggbreak)
 
 source("https://raw.githubusercontent.com/Koohoko/Save-ggplot-to-pptx/main/scripts/save_pptx.r")
 
@@ -47,11 +48,12 @@ df_n_isnvs <- df_snvs_meta_add_qc %>% group_by(sample) %>% summarise(n=n()) %>% 
 df_tmp <- df_meta %>% select(sample,Ct_value) %>% left_join(df_n_isnvs)
 df_tmp$n[is.na(df_tmp$n)] <- 0
 sum(df_tmp$n==0)
-mean(df_tmp$n)
+(n_isnvs_mean <- mean(df_tmp$n))
 df_tmp$Ct_value_break <- cut(df_tmp$Ct_value, 3)
 
 p_n_isnvs <- ggplot(df_tmp) +
 	geom_histogram(aes(x=n, fill=Ct_value_break), binwidth = 1, color="black", size=0.3)+
+   geom_vline(aes(xintercept=n_isnvs_mean), linetype="dashed")+
 	xlab("Number of iSNV sites in a sample")+
 	ylab("Number of samples")+
 	scale_x_continuous(breaks=seq(0,30,5))+
@@ -74,14 +76,17 @@ sum(df_tmp$n>1) # 243
 sum(df_tmp$n==1) # 1845
 sum(df_tmp$n==1)/nrow(df_tmp)
 
-p_n_sharing <- ggplot(df_tmp) +
-	geom_histogram(aes(x=n, fill=effect_sim), binwidth = 1, color="black", size=0.3)+
+p_n_sharing <- ggplot(df_tmp %>% ungroup() %>% group_by(effect_sim,n) %>% summarise(n_group=n(), n_group_log10=log10(n_group))) +
+	# geom_histogram(aes(x=n, fill=effect_sim), binwidth = 1, color="black", size=0.3)+
+	geom_col(aes(x=n, y=n_group, fill=effect_sim), color="black", size=0.3)+
 	xlab("Number of samples sharing iSNVs")+
 	ylab("Number of iSNVs")+
    scale_fill_manual(name="Variant type", values=pal_jama()(3)[c(3,2,1)])+
-	scale_x_continuous(breaks=seq(0,60,5))+
 	theme_minimal()+
 	theme(legend.position = "top")+
+	scale_x_continuous(breaks=seq(0,60,5))+
+   scale_y_break(breaks=c(30, 65), scales=0.3, expand=FALSE, ticklabels=c(65, 70, 75))+
+   scale_y_break(breaks=c(75, 95), scales=0.8, expand=FALSE, ticklabels=c(100, 500, 1000, 1500))+
 	NULL
 
 ## sequencing depth
@@ -286,7 +291,7 @@ p_genes <- ggplot(
 
 
 ### combine figures
-p_out_top <- (p_n_isnvs+ggtitle("A"))|(p_n_sharing+ggtitle("B")) 
+p_out_top <- (p_n_isnvs+ggtitle("A"))|(print(p_n_sharing+ggtitle("B"))) 
 p_out_bottom <- (p_mut_type_boot+ggtitle("C"))/(p1+ggtitle("D"))/(p2+ggtitle("E"))/(p_genes+ggtitle("F")) + plot_layout(heights = c(1, 1, 1, 0.3)) 
 # p_out <- ((p_n_isnvs+ggtitle("A"))|(p_n_sharing+ggtitle("B")))/((p_depth+ggtitle("C"))/(p1+ggtitle("D"))/(p2+ggtitle("E"))) + plot_layout(heights = c(1, 3))
 p_out <- p_out_top/p_out_bottom + plot_layout(heights = c(1, 3.5)) 
@@ -357,7 +362,7 @@ p_pre2 <- ggscatter(df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x =
    )+
    xlab("Detection lag (days)")+
    ylab("Number of iSNVs per Kb")+
-   stat_cor(method = "pearson", label.x = 10, label.y = 1.3)+
+   stat_cor(method = "pearson", label.x = 0, label.y = 1.3)+
    NULL
 ggsave("../results/detection_lag_vs_isnvs.pdf", plot=p_pre2)
 p_aft2 <- ggscatter(df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x = "detection_lag", y = "n_per_kb_adj",
@@ -369,7 +374,7 @@ p_aft2 <- ggscatter(df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x =
    )+
    xlab("Detection lag (days)")+
    ylab("Number of iSNVs per Kb (adjusted)")+
-   stat_cor(method = "pearson", label.x = 10, label.y = 1.3)+
+   stat_cor(method = "pearson", label.x = 0, label.y = 1.3)+
    NULL
 
 
@@ -382,7 +387,7 @@ p_out_lag <- ggscatter(df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), 
    )+
    xlab("Ct value")+
    ylab("Detection lag (days)")+
-   stat_cor(method = "pearson", label.x = 10, label.y = 15)+
+   stat_cor(method = "pearson", label.x = 10, label.y = 20)+
    NULL
 
 #### MAF
@@ -394,10 +399,10 @@ p_maf <- ggscatter(df_snvs_meta_add_qc_adj %>% filter(gene=="Full genome"), x = 
    )+
    xlab("Ct value")+
    ylab("MAF")+
-   stat_cor(method = "pearson", label.x = 10, label.y = 0.6)+
+   stat_cor(method = "pearson", label.x = 0, label.y = 0.6)+
    NULL
 
-p_out <- ((p_pre+ggtitle("A"))/(p_aft+ggtitle("C")))|((p_maf+ggtitle("B"))/(p_out_lag+ggtitle("D")))
+p_out <- ((p_pre+ggtitle("A"))/(p_maf+ggtitle("C"))/(p_aft+ggtitle("E")))|((p_pre2+ggtitle("B"))/(p_out_lag+ggtitle("D"))/(p_aft2+ggtitle("F")))
 ggsave("../results/n_per_kb_adjusted.pdf", width=10, height=10)
 
 # ggscatter(df_snvs_meta_add_qc_adj %>% filter(gene=="Full genome"), x = "Ct_value", y = "sec_freq_adj",

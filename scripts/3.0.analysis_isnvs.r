@@ -122,7 +122,7 @@ df_bam_rst <- mclapply(files_bam_rst_full, read_pysamstats, pp=FALSE, mc.cores=1
 df_bam_rst <- bind_rows(df_bam_rst[!is.na(df_bam_rst)])
 # save(df_bam_rst, file="../results/df_bam_rst_full.rdata")
 save(df_bam_rst, file="../results/df_bam_rst_full_notpp.rdata")
-# load("../results/df_bam_rst_full.rdata")
+# load("../results/df_bam_rst_full_notpp.rdata")
 
 df_meta <- df_meta %>% filter(sample %in% unique(df_bam_rst$sample))
 write_csv(df_meta, "../results/df_samples_clean.csv")

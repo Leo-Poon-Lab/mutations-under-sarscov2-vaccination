@@ -10,6 +10,7 @@ library(boot)
 library(writexl)
 library(parallel)
 library(RColorBrewer)
+library(patchwork)
 source("./helper/cal_nu_diveristy_pi.r")
 source("https://raw.githubusercontent.com/Koohoko/Save-ggplot-to-pptx/main/scripts/save_pptx.r")
 
@@ -737,34 +738,43 @@ pi_corr_factor <- 10000
 max_dNdS <- max(intrahost_results_bootstrap_LONG$dNdS, na.rm = TRUE)
 max_d_SE_max <- max(intrahost_results_bootstrap_LONG$d_SE_max, na.rm = TRUE)
 
+intrahost_results_bootstrap_LONG$significance_P <- ""
+intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.1, ]$significance_P <- '*'
+intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.05, ]$significance_P <- '**'
+intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.01, ]$significance_P <- '***'
+write_xlsx(intrahost_results_bootstrap_LONG, "../results/intrahost_allProductsbygroup_PLOT_SOURCE.xlsx")
+
 ### PLOT
 intrahost_results_bootstrap_LONG$outbreak
 
-n_color <- nrow(intrahost_results_bootstrap_LONG)/2
-(intrahost_allProductsbygroup_PLOT <- ggplot(data = filter(intrahost_results_bootstrap_LONG, gene_name %in% gene_names_allLevels),
+gene_list_1 <- c("Full genome", "S") 
+gene_list_2 <- gene_names_allLevels[!gene_names_allLevels %in% gene_list_1]
+
+n_color <- nrow(filter(intrahost_error_bar_colors, gene_name %in% gene_list_1))/2
+(intrahost_allProductsbygroup_PLOT_1 <- ggplot(data = filter(intrahost_results_bootstrap_LONG, gene_name %in% gene_list_1),
                                     mapping = aes(x = gene_name, y = d_value * pi_corr_factor, group = d_measure)) + #fill = d_measure)) +
     # Backdrop boxes based on which pi is higher
-    geom_bar(data = filter(intrahost_results_bootstrap_LONG, d_measure == 'dN', gene_name %in% gene_names_allLevels), mapping = aes(y = Inf, fill = dNdS_norm), stat = 'identity') +
+    geom_bar(data = filter(intrahost_results_bootstrap_LONG, d_measure == 'dN', gene_name %in% gene_list_1), mapping = aes(y = Inf, fill = dNdS_norm), stat = 'identity') +
     
-    geom_errorbar(data = filter(intrahost_error_bar_colors, gene_name %in% gene_names_allLevels), 
+    geom_errorbar(data = filter(intrahost_error_bar_colors, gene_name %in% gene_list_1), 
                   mapping =  aes(ymin = d_SE_min * pi_corr_factor, ymax = d_SE_max * pi_corr_factor), # , color = d_measure
                   color = rep(c('pink', 'lightblue'), n_color),
                   position = position_dodge(width = 0.5), width = 0, size = 1) +
-    geom_point(data = filter(intrahost_error_bar_colors, gene_name %in% gene_names_allLevels), 
+    geom_point(data = filter(intrahost_error_bar_colors, gene_name %in% gene_list_1), 
                mapping =  aes(y = d_SE_min * pi_corr_factor), # , color = d_measure
                color = rep(c('pink', 'lightblue'), n_color),
                position = position_dodge(width = 0.5), size = 0.29) + # size = 1
-    geom_point(data = filter(intrahost_error_bar_colors, gene_name %in% gene_names_allLevels), 
+    geom_point(data = filter(intrahost_error_bar_colors, gene_name %in% gene_list_1), 
                mapping =  aes(y = d_SE_max * pi_corr_factor), # color = d_measure
                color = rep(c('pink', 'lightblue'), n_color),
                position = position_dodge(width = 0.5), size = 0.29) +
     geom_point(stat = 'identity', position = position_dodge(width = 0.5), pch = 21, size = 2, stroke = 0, 
                fill = rep(c(brewer.pal(9, 'Set1')[1], brewer.pal(9, 'Set1')[2]), n_color), mapping=aes(color = d_measure)) + 
     
-    facet_grid(outbreak ~ ., scales = 'free', space = 'free_x',) +
+    facet_grid(outbreak ~ ., space = 'free_x') +
     theme_bw() +
     theme(panel.grid = element_blank(),
-          plot.title = element_text(hjust = 0.5),
+          # plot.title = element_text(hjust = 0.5),
         #   legend.position = 'bottom',
           legend.title = element_blank(),
         #   axis.text.x = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5), # angle = 90, hjust = 1, vjust = 1
@@ -775,31 +785,74 @@ n_color <- nrow(intrahost_results_bootstrap_LONG)/2
           axis.title.y = element_text(size = 8),
           panel.border = element_rect(),
           strip.text = element_text(size = 8),
-        #   strip.text.y = element_blank(),
-		  strip.text.y = element_text(angle = 0),
+          strip.text.y = element_blank() , 
           #legend.background = element_rect(fill = 'white', color = 'black'),
           strip.background = element_blank()) +
     xlab("") + 
     ylab(bquote('Differences per site ('*'x 10'^'-4'*')')) + 
     scale_x_discrete(guide = guide_axis(n.dodge = 2))+
     scale_y_continuous(breaks = scales::pretty_breaks(3), expand = expand_scale(mult = c(0, 0.1))) + # 0.1
-    scale_fill_gradient2(low = brewer.pal(9, "Blues")[5], mid = 'white', high = brewer.pal(9, "Reds")[5], midpoint = 0, na.value = "white")) 
+    scale_fill_gradient2(low = brewer.pal(9, "Blues")[5], mid = 'white', high = brewer.pal(9, "Reds")[5], midpoint = 0, na.value = "white", limits=c(-1,1))) 
+df_significance_label <- filter(intrahost_results_bootstrap_LONG, gene_name %in% gene_list_1) %>% group_by(outbreak) %>% mutate(group_max=max(d_SE_max)) %>% group_by(gene_name, outbreak) %>% summarise(significance_P=significance_P[1], d_SE_max = group_max*0.9, d_measure=d_measure[1])
+# p_out_1 <- intrahost_allProductsbygroup_PLOT_1 + geom_text(aes(x=gene_name, y=d_SE_max * pi_corr_factor, label=significance_P), data=df_significance_label)
+p_out_1 <- intrahost_allProductsbygroup_PLOT_1 + geom_text(aes(x=gene_name, y=1.4, label=significance_P), data=df_significance_label)
+
+
+n_color <- nrow(filter(intrahost_error_bar_colors, gene_name %in% gene_list_2))/2
+(intrahost_allProductsbygroup_PLOT_2 <- ggplot(data = filter(intrahost_results_bootstrap_LONG, gene_name %in% gene_list_2),
+                                    mapping = aes(x = gene_name, y = d_value * pi_corr_factor, group = d_measure)) + #fill = d_measure)) +
+    # Backdrop boxes based on which pi is higher
+    geom_bar(data = filter(intrahost_results_bootstrap_LONG, d_measure == 'dN', gene_name %in% gene_list_2), mapping = aes(y = Inf, fill = dNdS_norm), stat = 'identity') +
+    
+    geom_errorbar(data = filter(intrahost_error_bar_colors, gene_name %in% gene_list_2), 
+                  mapping =  aes(ymin = d_SE_min * pi_corr_factor, ymax = d_SE_max * pi_corr_factor), # , color = d_measure
+                  color = rep(c('pink', 'lightblue'), n_color),
+                  position = position_dodge(width = 0.5), width = 0, size = 1) +
+    geom_point(data = filter(intrahost_error_bar_colors, gene_name %in% gene_list_2), 
+               mapping =  aes(y = d_SE_min * pi_corr_factor), # , color = d_measure
+               color = rep(c('pink', 'lightblue'), n_color),
+               position = position_dodge(width = 0.5), size = 0.29) + # size = 1
+    geom_point(data = filter(intrahost_error_bar_colors, gene_name %in% gene_list_2), 
+               mapping =  aes(y = d_SE_max * pi_corr_factor), # color = d_measure
+               color = rep(c('pink', 'lightblue'), n_color),
+               position = position_dodge(width = 0.5), size = 0.29) +
+    geom_point(stat = 'identity', position = position_dodge(width = 0.5), pch = 21, size = 2, stroke = 0, 
+               fill = rep(c(brewer.pal(9, 'Set1')[1], brewer.pal(9, 'Set1')[2]), n_color), mapping=aes(color = d_measure)) + 
+    
+    facet_grid(outbreak ~ ., space = 'free_x',) +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          # plot.title = element_text(hjust = 0.5),
+        #   legend.position = 'bottom',
+          legend.title = element_blank(),
+        #   axis.text.x = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5), # angle = 90, hjust = 1, vjust = 1
+          #axis.text.x = element_text(size = 9, face = "italic"), # angle = 90, hjust = 1, vjust = 1
+          axis.text.y = element_text(size = 8),
+          #axis.ticks.y.right = element_line(colour = '#DCB118'),
+          #axis.text.y.right = element_text(color = '#DCB118'),
+          axis.title.y = element_blank(),
+          panel.border = element_rect(),
+          strip.text = element_text(size = 8),
+        #   strip.text.y = element_blank(),
+		      strip.text.y = element_text(angle = 0),
+          #legend.background = element_rect(fill = 'white', color = 'black'),
+          strip.background = element_blank()) +
+    xlab("") + 
+    ylab(bquote('Differences per site ('*'x 10'^'-4'*')')) + 
+    scale_x_discrete(guide = guide_axis(n.dodge = 2))+
+    scale_y_continuous(breaks = scales::pretty_breaks(3), expand = expand_scale(mult = c(0, 0.1))) + # 0.1
+    scale_fill_gradient2(low = brewer.pal(9, "Blues")[5], mid = 'white', high = brewer.pal(9, "Reds")[5], midpoint = 0, na.value = "white", limits=c(-1,1))) 
+df_significance_label <- filter(intrahost_results_bootstrap_LONG, gene_name %in% gene_list_2) %>% group_by(outbreak) %>% mutate(group_max=max(d_SE_max)) %>% group_by(gene_name, outbreak) %>% summarise(significance_P=significance_P[1], d_SE_max = group_max*0.9, d_measure=d_measure[1])
+# p_out_2 <- intrahost_allProductsbygroup_PLOT_2 + geom_text(aes(x=gene_name, y=d_SE_max * pi_corr_factor, label=significance_P), data=df_significance_label)
+p_out_2 <- intrahost_allProductsbygroup_PLOT_2 + geom_text(aes(x=gene_name, y=2.5, label=significance_P), data=df_significance_label)
+
 # ggsave("../results/helper.pdf")
 # save_pptx("../results/helper.pptx")
 
 # SAVE SOURCE
-intrahost_results_bootstrap_LONG$significance_P <- ""
-intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.1, ]$significance_P <- '*'
-intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.05, ]$significance_P <- '**'
-intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.01, ]$significance_P <- '***'
-write_xlsx(intrahost_results_bootstrap_LONG, "../results/intrahost_allProductsbygroup_PLOT_SOURCE.xlsx")
-
-
-df_significance_label <- intrahost_results_bootstrap_LONG %>% group_by(outbreak) %>% mutate(group_max=max(d_SE_max)) %>% group_by(gene_name, outbreak) %>% summarise(significance_P=significance_P[1], d_SE_max = group_max*0.9, d_measure=d_measure[1])
-p_out <- intrahost_allProductsbygroup_PLOT + geom_text(aes(x=gene_name, y=d_SE_max * pi_corr_factor, label=significance_P), data=df_significance_label)
-p_out <- intrahost_allProductsbygroup_PLOT + geom_text(aes(x=gene_name, y=2.5, label=significance_P), data=df_significance_label)
+p_out <- ((p_out_1 + ggtitle("A")) | (p_out_2+ggtitle("B"))) + plot_layout(guides="collect", widths=c(2,8)) & theme(legend.position='right')
 # SAVE PLOT
-ggsave(filename = "../results/intrahost_allProductsbygroup_PLOT.pdf", width = 6, height = 6*sqrt(2)-1, plot=p_out)
+ggsave(filename = "../results/intrahost_allProductsbygroup_PLOT.pdf", width = 8, height = 6*sqrt(2)-1, plot=p_out)
 save_pptx(file = "../results/intrahost_allProductsbygroup_PLOT.pptx", width = 6, height = 6*sqrt(2)-1,  plot=p_out)
 
 
