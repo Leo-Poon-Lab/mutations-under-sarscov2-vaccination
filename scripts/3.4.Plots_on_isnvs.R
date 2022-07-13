@@ -16,7 +16,7 @@ names(colors_lineage) <- c("Alpha", "Delta", "Omicron", "B.1.36", "B.1.36.27", "
 colors_vaccine=c("#a65628", "#7570b3", "#999999")
 names(colors_vaccine)=c("BioNTech", "Sinovac", "Non-vaccinated")
 colors_vaccine_new <- colors_vaccine
-names(colors_vaccine_new)=c("BioNTech", "Sinovac", "Unvaccinated")
+names(colors_vaccine_new)=c("Comirnaty", "CoronaVac", "Unvaccinated")
 df_orf_sim <- read_csv("../data/ORF_SCoV2_sim.csv")
 
 # load("../results/df_bam_rst.rdata")

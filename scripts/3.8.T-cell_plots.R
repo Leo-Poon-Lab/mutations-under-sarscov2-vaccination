@@ -4,7 +4,7 @@ library(ggsci)
 library(patchwork)
 
 colors_vaccine=c("#a65628", "#7570b3", "#999999")
-names(colors_vaccine) <- c("BioNTech", "Sinovac", "Unvaccinated")
+names(colors_vaccine) <- c("Comirnaty", "CoronaVac", "Unvaccinated")
 
 df_f5a_delta_cd8 <- read_excel("../draft/2022-06-28/From_ust/Data_Figure4A.xlsx", sheet=1)
 df_f5a_delta_cd4 <- read_excel("../draft/2022-06-28/From_ust/Data_Figure4A.xlsx", sheet=2)
@@ -46,6 +46,8 @@ df_fs10b_omicron_cd4 <- df_fs10b_omicron_cd4 %>% mutate(type = "Omicron (HK epit
 # Figure 5
 df_f5a <- bind_rows(df_f5a_delta_cd8, df_f5a_delta_cd4, df_f5a_omicron_cd8, df_f5a_omicron_cd4)
 df_f5a$name <- gsub("Non-vaccinated", "Unvaccinated", df_f5a$name)
+df_f5a$name <- gsub("BioNTech", "Comirnaty", df_f5a$name)
+df_f5a$name <- gsub("Sinovac", "CoronaVac", df_f5a$name)
 df_f5a$vaccine <- gsub(" .+", "", df_f5a$name)
 df_f5a$lineage <- gsub(".+ ", "", df_f5a$name)
 
@@ -61,6 +63,8 @@ p_5a <- ggplot(df_f5a) +
 
 df_f5b <- bind_rows(df_f5b_delta_cd8, df_f5b_delta_cd4, df_f5b_omicron_cd8, df_f5b_omicron_cd4)
 df_f5b$name <- gsub("Non-vaccinated", "Unvaccinated", df_f5b$name)
+df_f5b$name <- gsub("BioNTech", "Comirnaty", df_f5b$name)
+df_f5b$name <- gsub("Sinovac", "CoronaVac", df_f5b$name)
 df_f5b$vaccine <- gsub(" .+", "", df_f5b$name)
 df_f5b$lineage <- gsub(".+ ", "", df_f5b$name)
 
@@ -80,6 +84,8 @@ ggsave("../results/figure_5.pdf", width=8, height=8, plot=p5)
 # Figure S10
 df_fs10a <- bind_rows(df_fs10a_delta_cd8, df_fs10a_delta_cd4, df_fs10a_omicron_cd8, df_fs10a_omicron_cd4)
 df_fs10a$name <- gsub("Non-vaccinated", "Unvaccinated", df_fs10a$name)
+df_fs10a$name <- gsub("BioNTech", "Comirnaty", df_fs10a$name)
+df_fs10a$name <- gsub("Sinovac", "CoronaVac", df_fs10a$name)
 df_fs10a$vaccine <- gsub(" .+", "", df_fs10a$name)
 df_fs10a$lineage <- gsub(".+ ", "", df_fs10a$name)
 
@@ -95,6 +101,8 @@ p_s10a <- ggplot(df_fs10a) +
 
 df_fs10b <- bind_rows(df_fs10b_delta_cd8, df_fs10b_delta_cd4, df_fs10b_omicron_cd8, df_fs10b_omicron_cd4)
 df_fs10b$name <- gsub("Non-vaccinated", "Unvaccinated", df_fs10b$name)
+df_fs10b$name <- gsub("BioNTech", "Comirnaty", df_fs10b$name)
+df_fs10b$name <- gsub("Sinovac", "CoronaVac", df_fs10b$name)
 df_fs10b$vaccine <- gsub(" .+", "", df_fs10b$name)
 df_fs10b$lineage <- gsub(".+ ", "", df_fs10b$name)
 

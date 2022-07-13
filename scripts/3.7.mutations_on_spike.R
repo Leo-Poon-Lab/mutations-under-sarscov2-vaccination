@@ -42,7 +42,7 @@ for (group_i in groups_unique) {
 	SNP <- df_tmp$pos_aa
 	Mutations <- GRanges("chr1", IRanges(SNP, width=1, names=gsub("p.", "", df_tmp$mut_aa, fixed=T)))
 	Mutations$score <- df_tmp$N
-	Mutations$color <- as.character(df_tmp$color)
+	# Mutations$color <- as.character(df_tmp$color)
 	muts_list[[group_i]] <- Mutations
 	features_list[[group_i]] <- features
 }

@@ -139,8 +139,6 @@ df_bam_rst$pos_cut = cut(df_bam_rst$pos, breaks_geneome, dig.lab = 10)
 df_tmp <- df_plot %>% group_by(sample, Vaccine, lineage_sim, effect_sim, pos_cut) %>% summarise(n=n())
 df_bam_rst_depth <- df_bam_rst %>% filter(sample %in% unique(df_tmp$sample)) %>% group_by(sample, pos_cut) %>% filter(reads_all>=100) %>% summarise(n_high_depth=n()) 
 
-write_xlsx(df_plot_join, "../results/iSNVs_incidence_across_genome_more.xlsx")
-
 df_full <- full_join(df_meta %>% select(sample, Vaccine, lineage_sim) %>% arrange(Vaccine, lineage_sim, sample), df_plot %>% select(pos_cut) %>% unique(), by = character())  ## add samples without iSNVs
 df_full$group <- paste(df_full$Vaccine, df_full$lineage_sim)
 df_full <- df_full %>% mutate(group=gsub("Non-", "Un", group))
@@ -154,11 +152,26 @@ df_plot_join <- left_join(df_plot_join, df_bam_rst_depth, c("sample", "pos_cut")
 df_plot_join$n_per_pos <- df_plot_join$n/df_plot_join$n_high_depth
 df_plot_join$n_per_pos[is.na(df_plot_join$n_per_pos)] <- 0
 df_plot_join$n_per_kb <- df_plot_join$n_per_pos*1000
+write_xlsx(df_plot_join, "../results/iSNVs_incidence_across_genome_more.xlsx")
 
 df_plot_join_n <- df_plot_join %>% select(sample, pos_cut, n_per_kb, Vaccine, lineage_sim, effect_sim) %>% group_by(pos_cut, effect_sim) %>% summarise(n=n(), n_per_kb_mean=mean(n_per_kb))
 
+df_n_s_sites <- read_tsv("../results/snpgenie/BioNTech-Delta/WHP4592/codon_results.txt")
+df_n_s_sites <- df_n_s_sites %>% arrange(site)
+df_plot_join_n$sites <- sapply(seq_len(nrow(df_plot_join_n)), function(i) {
+   pos_stop <- gsub(".+,", "", df_plot_join_n$pos_cut[i])
+   pos_stop <- as.numeric(gsub("]", "", pos_stop))
+   pos_start <- pos_stop-999
+   if(df_plot_join_n$effect_sim[i]=="Nonsynonymous"){
+      return(sum(df_n_s_sites$N_sites[(df_n_s_sites$site>=pos_start) & (df_n_s_sites$site<=pos_stop)]))
+   } else {
+      return(sum(df_n_s_sites$S_sites[(df_n_s_sites$site>=pos_start) & (df_n_s_sites$site<=pos_stop)]))
+   }
+})
+df_plot_join_n$n_per_sites <- df_plot_join_n$n_per_kb_mean*1000 / df_plot_join_n$sites
+
 p1 <- ggplot(df_plot_join_n) +
-	geom_col(aes(x=pos_cut, y=n_per_kb_mean, fill=effect_sim), position=position_dodge(preserve="total"), color="black", size=0.3)+
+	geom_col(aes(x=pos_cut, y=n_per_sites, fill=effect_sim), position=position_dodge(preserve="total"), color="black", size=0.3)+
 	# facet_wrap(vars(lineage_sim), ncol=1)+
 	scale_x_discrete(breaks = levels(df_plot$pos_cut)[seq(1,30,2)], expand = c(0.05,0.05), guide = guide_axis(n.dodge = 2))+
    scale_fill_manual(name="Variant type", values=pal_jama()(3)[c(3,2,1)])+
@@ -166,7 +179,7 @@ p1 <- ggplot(df_plot_join_n) +
 	# theme(axis.text.x = element_text(angle = 30, vjust = 0.5, hjust=1)) +
 	theme(legend.position = "top")+
 	xlab("Genomic positions")+
-	ylab("Average number of iSNVs per Kb")+
+	ylab("Average number of iSNVs per\nsynonymous/non-synonymous site")+
 	NULL
 p1
 
