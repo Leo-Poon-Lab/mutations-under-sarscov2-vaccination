@@ -201,6 +201,9 @@ p1_more
 ggsave("../results/iSNVs_incidence_across_genome_more.pdf", height=12, width=8)
 
 ### mutation type frequency: e.g. C->U, A->C
+N_sites_total <- sum(df_n_s_sites$N_sites)
+S_sites_total <- sum(df_n_s_sites$S_sites)
+
 df_full <- full_join(tibble(REF=c("A", "C", "G", "T")), tibble(ALT=c("A", "C", "G", "T")), by=character())
 df_full <- df_full[df_full$REF!=df_full$ALT,]
 df_full <- full_join(df_meta %>% select(sample), df_full, by=character())
@@ -209,7 +212,11 @@ df_tmp <- df_snvs_meta_add_qc %>% mutate(REF=X4, ALT=X5) %>% group_by(sample, RE
 df_tmp <- left_join(df_full, df_tmp)
 df_tmp$n[is.na(df_tmp$n)] <- 0
 df_tmp$mutation <- paste0(df_tmp$REF, ">", df_tmp$ALT)
-(df_tmp_summary <- df_tmp %>% group_by(mutation, effect_sim) %>% summarise(mean=mean(n), max=max(n)) %>% arrange(mean))
+(df_tmp_summary <- df_tmp %>% group_by(effect_sim) %>% summarise(mean=mean(n), max=max(n), n_samples=length(unique(sample))) %>% arrange(mean))
+df_tmp_summary$mean_adj <- sapply(seq_len(nrow(df_tmp_summary)), function(i) {
+   num_adjust <- ifelse(df_tmp_summary$effect_sim[i]=="Nonsynonymous", N_sites_total, S_sites_total)
+   df_tmp_summary$mean[i]/num_adjust
+})
 
 df_tmp <- df_tmp %>% select(-REF, -ALT)
 
@@ -218,11 +225,12 @@ df_boot <- mclapply(unique(df_tmp_summary$mutation), function(mutation_i) {
    print(mutation_i)
    rsts <- c()
    for (effect_i in c("Nonsynonymous", "Synonymous")) {
-      mut_function <- function(D, indices) {
+      num_adjust <- ifelse(effect_i=="Nonsynonymous", N_sites_total, S_sites_total)
+      mut_function <- function(D, indices, num_adjust) {
          df_tmp <- D[indices,]
-         mean(df_tmp$n[df_tmp$mutation==mutation_i & df_tmp$effect_sim==effect_i], na.rm = TRUE) 
+         mean(df_tmp$n[df_tmp$mutation==mutation_i & df_tmp$effect_sim==effect_i], na.rm = TRUE)/num_adjust
       }
-      (boot_mean <- boot(data = df_tmp, R = 10000, statistic = mut_function, parallel = 'multicore', ncpus = 2))
+      boot_mean <- boot(data = df_tmp, R = 10000, statistic = mut_function, parallel = 'multicore', ncpus = 2, num_adjust=num_adjust)
       rst <- c(mutation_i, effect_i, boot_mean$t0, sd(boot_mean$t))
       print(effect_i)
       print(rst)
@@ -243,11 +251,12 @@ p_mut_type_boot <- ggplot(df_boot_m, aes(x=Mutation)) +
     geom_point(mapping =  aes(y = Mean+SD, color=Type), 
                position = position_dodge(width = 0.5), size = 1.2) +
    geom_point(aes(y=Mean, fill=Type), position = position_dodge(width = 0.5), size=3, shape=21, alpha=0.9) +
+   geom_hline(aes(yintercept=mean_adj, color=effect_sim), data=df_tmp_summary, linetype="dashed")+
     scale_color_manual(name="Variant type", values=pal_jama()(3)[c(3,2)])+   
     scale_fill_manual(name="Variant type", values=pal_jama()(3)[c(3,2)])+   
    theme_minimal()+
 	theme(legend.position = "top")+
-   ylab("Mean frequency per sample")+
+   ylab("iSNVs frequency per sample per\nsynonymous/non-synonymous site")+
     NULL
 p_mut_type_boot
 
