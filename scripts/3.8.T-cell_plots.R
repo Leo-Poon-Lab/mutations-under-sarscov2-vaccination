@@ -19,10 +19,10 @@ df_f5b_delta_cd8 <- read_excel("../draft/2022-06-28/From_ust/Data_Figure4B.xlsx"
 df_f5b_delta_cd4 <- read_excel("../draft/2022-06-28/From_ust/Data_Figure4B.xlsx", sheet=2)
 df_f5b_omicron_cd8 <- read_excel("../draft/2022-06-28/From_ust/Data_Figure4B.xlsx", sheet=3)
 df_f5b_omicron_cd4 <- read_excel("../draft/2022-06-28/From_ust/Data_Figure4B.xlsx", sheet=4)
-df_f5b_delta_cd8 <- df_f5b_delta_cd8 %>% mutate(type = "Delta (HK epitope-HLA pairs)", T_cell="CD8+") %>% pivot_longer(`Non-vaccinated Delta`:`Sinovac Delta`)
-df_f5b_delta_cd4 <- df_f5b_delta_cd4 %>% mutate(type = "Delta (HK epitope-HLA pairs)", T_cell="CD4+") %>% pivot_longer(`Non-vaccinated Delta`:`Sinovac Delta`)
-df_f5b_omicron_cd8 <- df_f5b_omicron_cd8 %>% mutate(type = "Omicron (HK epitope-HLA pairs)", T_cell="CD8+") %>% pivot_longer(`Non-vaccinated Omicron`:`Sinovac Omicron`)
-df_f5b_omicron_cd4 <- df_f5b_omicron_cd4 %>% mutate(type = "Omicron (HK epitope-HLA pairs)", T_cell="CD4+") %>% pivot_longer(`Non-vaccinated Omicron`:`Sinovac Omicron`)
+df_f5b_delta_cd8 <- df_f5b_delta_cd8 %>% mutate(type = "Delta (Hong Kong-specific epitopes)", T_cell="CD8+") %>% pivot_longer(`Non-vaccinated Delta`:`Sinovac Delta`)
+df_f5b_delta_cd4 <- df_f5b_delta_cd4 %>% mutate(type = "Delta (Hong Kong-specific epitopes)", T_cell="CD4+") %>% pivot_longer(`Non-vaccinated Delta`:`Sinovac Delta`)
+df_f5b_omicron_cd8 <- df_f5b_omicron_cd8 %>% mutate(type = "Omicron (Hong Kong-specific epitopes)", T_cell="CD8+") %>% pivot_longer(`Non-vaccinated Omicron`:`Sinovac Omicron`)
+df_f5b_omicron_cd4 <- df_f5b_omicron_cd4 %>% mutate(type = "Omicron (Hong Kong-specific epitopes)", T_cell="CD4+") %>% pivot_longer(`Non-vaccinated Omicron`:`Sinovac Omicron`)
 
 df_fs10a_delta_cd8 <- read_excel("../draft/2022-06-28/From_ust/Data_FigureS8A.xlsx", sheet=1)
 df_fs10a_delta_cd4 <- read_excel("../draft/2022-06-28/From_ust/Data_FigureS8A.xlsx", sheet=2)
@@ -37,10 +37,10 @@ df_fs10b_delta_cd8 <- read_excel("../draft/2022-06-28/From_ust/Data_FigureS8B.xl
 df_fs10b_delta_cd4 <- read_excel("../draft/2022-06-28/From_ust/Data_FigureS8B.xlsx", sheet=2)
 df_fs10b_omicron_cd8 <- read_excel("../draft/2022-06-28/From_ust/Data_FigureS8B.xlsx", sheet=3)
 df_fs10b_omicron_cd4 <- read_excel("../draft/2022-06-28/From_ust/Data_FigureS8B.xlsx", sheet=4)
-df_fs10b_delta_cd8 <- df_fs10b_delta_cd8 %>% mutate(type = "Delta (HK epitope-HLA pairs)", T_cell="CD8+") %>% pivot_longer(`Non-vaccinated Delta`:`Sinovac Delta`)
-df_fs10b_delta_cd4 <- df_fs10b_delta_cd4 %>% mutate(type = "Delta (HK epitope-HLA pairs)", T_cell="CD4+") %>% pivot_longer(`Non-vaccinated Delta`:`Sinovac Delta`)
-df_fs10b_omicron_cd8 <- df_fs10b_omicron_cd8 %>% mutate(type = "Omicron (HK epitope-HLA pairs)", T_cell="CD8+") %>% pivot_longer(`Non-vaccinated Omicron`:`Sinovac Omicron`)
-df_fs10b_omicron_cd4 <- df_fs10b_omicron_cd4 %>% mutate(type = "Omicron (HK epitope-HLA pairs)", T_cell="CD4+") %>% pivot_longer(`Non-vaccinated Omicron`:`Sinovac Omicron`)
+df_fs10b_delta_cd8 <- df_fs10b_delta_cd8 %>% mutate(type = "Delta (Hong Kong-specific epitopes)", T_cell="CD8+") %>% pivot_longer(`Non-vaccinated Delta`:`Sinovac Delta`)
+df_fs10b_delta_cd4 <- df_fs10b_delta_cd4 %>% mutate(type = "Delta (Hong Kong-specific epitopes)", T_cell="CD4+") %>% pivot_longer(`Non-vaccinated Delta`:`Sinovac Delta`)
+df_fs10b_omicron_cd8 <- df_fs10b_omicron_cd8 %>% mutate(type = "Omicron (Hong Kong-specific epitopes)", T_cell="CD8+") %>% pivot_longer(`Non-vaccinated Omicron`:`Sinovac Omicron`)
+df_fs10b_omicron_cd4 <- df_fs10b_omicron_cd4 %>% mutate(type = "Omicron (Hong Kong-specific epitopes)", T_cell="CD4+") %>% pivot_longer(`Non-vaccinated Omicron`:`Sinovac Omicron`)
 
 
 # Figure 5
@@ -56,7 +56,7 @@ p_5a <- ggplot(df_f5a) +
 	facet_grid(rows=vars(T_cell), cols=vars(type), scales="free_x")+
 	theme_classic()+
 	scale_fill_manual(name="Vaccine",values=colors_vaccine)+
-	theme(axis.text.x = element_text(angle = 15, hjust=1),
+	theme(axis.text.x = element_text(angle = 15, vjust=0.5),
 		axis.title.x = element_blank())+
 	ylab("Overlapping T cell epitopes per mutation")+
 	ggtitle("A")
@@ -73,7 +73,7 @@ p_5b <- ggplot(df_f5b) +
 	facet_grid(rows=vars(T_cell), cols=vars(type), scales="free_x")+
 	theme_classic()+
 	scale_fill_manual(name="Vaccine", values=colors_vaccine)+
-	theme(axis.text.x = element_text(angle = 15, hjust=1),
+	theme(axis.text.x = element_text(angle = 15, vjust=0.5),
 		axis.title.x = element_blank())+
 	ylab("Overlapping T cell epitopes per mutation")+
 	ggtitle("B")
@@ -94,7 +94,7 @@ p_s10a <- ggplot(df_fs10a) +
 	facet_grid(rows=vars(T_cell), cols=vars(type), scales="free_x")+
 	theme_classic()+
 	scale_fill_manual(name="Vaccine",values=colors_vaccine)+
-	theme(axis.text.x = element_text(angle = 15, hjust=1),
+	theme(axis.text.x = element_text(angle = 15, vjust=0.5),
 		axis.title.x = element_blank())+
 	ylab("Overlapping T cell epitopes per mutation")+
 	ggtitle("A")
@@ -111,10 +111,11 @@ p_s10b <- ggplot(df_fs10b) +
 	facet_grid(rows=vars(T_cell), cols=vars(type), scales="free_x")+
 	theme_classic()+
 	scale_fill_manual(name="Vaccine", values=colors_vaccine)+
-	theme(axis.text.x = element_text(angle = 15, hjust=1),
+	theme(axis.text.x = element_text(angle = 15, vjust=0.5),
 		axis.title.x = element_blank())+
 	ylab("Overlapping T cell epitopes per mutation")+
 	ggtitle("B")
 
 ps10 <- (p_s10a / p_s10b) + plot_layout(guides="collect") & theme(legend.position='right')
 ggsave("../results/figure_s10.pdf", width=8, height=8, plot=ps10)
+

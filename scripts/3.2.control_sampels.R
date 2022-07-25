@@ -62,6 +62,7 @@ samples_pass_filter_case_id <- sapply(samples_pass_filter, function(x) {
 })
 cases_have_duplicate <- table(samples_pass_filter_case_id)[table(samples_pass_filter_case_id)>1]
 length(cases_have_duplicate) # 86 cases have high quality replicates
+sort(cases_have_duplicate)
 samples_high_quality <- unique(df_bam_rst$sample)[samples_pass_filter_case_id %in% names(cases_have_duplicate)] # 179 samples
 
 df_bam_rst <- df_bam_rst %>% filter(sample %in% samples_high_quality)
@@ -228,4 +229,46 @@ sum(df_tmp$n==1)/nrow(df_tmp)
 sum(df_tmp$n>1)/nrow(df_tmp)
 
 
+120/243
+125/1845
 chisq.test(matrix(c(120, 125, 243, 1845), nrow=2)) # p<0.01
+
+unique(df_snvs_meta_add_qc$sample)
+df_snvs_meta_add_qc %>% group_by(case_id) %>% summarise(N=n()) %>% filter(N>1)
+
+cases_have_duplicate
+
+df_shared_isnvs <- sapply(unique(df_snvs_meta_add_qc$case_id), function(case_id_i) {
+	print(case_id_i)
+
+	df_same_patient_i <- df_snvs_meta_add_qc %>% filter(case_id==case_id_i)
+	df_diff_patient_i <- df_snvs_meta_add_qc %>% filter(case_id!=case_id_i)
+	samples_same_i <- unique(df_same_patient_i$sample)
+	if(length(samples_same_i)<2){return(c(NA,NA))}
+
+
+	rst_same_i <- apply(combn(samples_same_i,2),2,function(pairs) {
+		sites_1 <- df_same_patient_i$X2[df_same_patient_i$sample==pairs[1]]
+		sites_2 <- df_same_patient_i$X2[df_same_patient_i$sample==pairs[2]]
+		sum(sites_1 %in% sites_2)/length(unique(df_same_patient_i$X2))
+	})
+
+	samples_diff_i <- unique(df_diff_patient_i$sample)
+	rst_diff_i <- sapply(samples_same_i, function(sample_i) {
+		sites_1 <- df_same_patient_i$X2[df_same_patient_i$sample==sample_i]
+		rst_tmp <- sapply(samples_diff_i, function(sample_j) {
+			sites_2 <- df_diff_patient_i$X2[df_diff_patient_i$sample==sample_j]
+			sum(sites_1 %in% sites_2)/length(unique(c(df_diff_patient_i$X2, df_same_patient_i$X2)))
+		})
+		mean(rst_tmp)		
+	})
+
+	return(c(mean(rst_same_i), mean(rst_diff_i)))
+})
+
+df_shared_isnvs <- t(df_shared_isnvs)
+mean(df_shared_isnvs[,1], na.rm=T)
+mean(df_shared_isnvs[,2], na.rm=T)
+median(df_shared_isnvs[,1], na.rm=T)
+median(df_shared_isnvs[,2], na.rm=T)
+wilcox.test(df_shared_isnvs[,1], df_shared_isnvs[,2])

@@ -683,7 +683,7 @@ intrahost_results_bootstrap_LONG$significance[intrahost_results_bootstrap_LONG$s
 
 # ORDER AND NAME THE GENES
 unique(intrahost_results_bootstrap_LONG$gene_name)
-unique(codon_results$product_segment)
+# unique(codon_results$product_segment)
 
 #gene_ids_sorted <- c("ORF1ab", "S", "ORF3a", "E", "M", "ORF6", "ORF7a", "ORF7b", "ORF8", "N", "ORF10")
 unique(intrahost_results_bootstrap_LONG$gene_name)
@@ -739,9 +739,9 @@ max_dNdS <- max(intrahost_results_bootstrap_LONG$dNdS, na.rm = TRUE)
 max_d_SE_max <- max(intrahost_results_bootstrap_LONG$d_SE_max, na.rm = TRUE)
 
 intrahost_results_bootstrap_LONG$significance_P <- ""
-intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.1, ]$significance_P <- '*'
-intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.05, ]$significance_P <- '**'
-intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.01, ]$significance_P <- '***'
+intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.1, ]$significance_P <- '^'
+intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.05, ]$significance_P <- '*'
+intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.01, ]$significance_P <- '**'
 write_xlsx(intrahost_results_bootstrap_LONG, "../results/intrahost_allProductsbygroup_PLOT_SOURCE.xlsx")
 
 ### PLOT

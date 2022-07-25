@@ -11,7 +11,7 @@ source("https://raw.githubusercontent.com/Koohoko/Save-ggplot-to-pptx/main/scrip
 source('./helper/plot_box.R')
 source("./helper/df_test.R")
 
-colors_lineage=c("#e41a1c", "#33a02c", "#1f78b4", "#ff7f00", "#f781bf", "#666666") 
+colors_lineage=c("#e6ab02", "#4daf4a", "#984ea3", "#ff7f00", "#f781bf", "#666666") 
 names(colors_lineage) <- c("Alpha", "Delta", "Omicron", "B.1.36", "B.1.36.27", "B.1.1.63")
 colors_vaccine=c("#a65628", "#7570b3", "#999999")
 names(colors_vaccine)=c("BioNTech", "Sinovac", "Non-vaccinated")
@@ -183,6 +183,46 @@ p_out_1 <- (p1_1_p) + (p2_1+ggtitle("B")) + (p3_1_p) + plot_layout(ncol=1, guide
 ggsave("../results/Figure 2.pdf", width=8, height=8, plot= p_out_1)
 p_out_2 <- (p1_2_p+ggtitle("A")) + (p2_2+ggtitle("B")) + (p3_2_p+ggtitle("C")) + plot_layout(ncol=1, guides="collect") & theme(legend.position='right')
 ggsave("../results/Figure 2_supp.pdf", width=8, height=8, plot= p_out_2)
+
+
+# update on 2022-07-20
+## Figure 2 upper
+p1_1 <- plot_box(df_plot=df_plot_n_gene_meta_adj %>% filter(gene=="Full genome", Vaccine=="Unvaccinated"), x_var="Vaccine", y_var="n_per_kb_adj", color_var="lineage_sim", y_lab="Number of iSNVs per Kb (adjusted)", x_lab="Vaccine")+theme(axis.title.x = element_blank())
+p1_1 <- p1_1 + scale_color_manual(name="Lineage", values=colors_lineage)
+p1_1_p <- p1_1+
+   ggtitle("A")+
+   geom_signif(y_position = 0.55+seq(0,4)/20, xmin = c(2.8,2.8,2.8,2.9,3.1)-2, xmax = c(3.08,3.2,3.3,3.3,3.3)-2, annotation = c("*","**","*","**","*"), color="black", vjust=0.65, tip_length = 0.01)
+
+p2_1 <- plot_box(df_snvs_meta_add_qc %>% filter(gene=="Full genome", Vaccine=="Unvaccinated"), x_var="Vaccine", y_var="sec_freq", color_var="lineage_sim", y_lab="MAF", x_lab="Vaccine")+theme(axis.title.x = element_blank())
+p2_1 <- p2_1 + scale_color_manual(name="Lineage", values=colors_lineage)
+
+p3_1 <- plot_box(df_plot_pi %>% filter(Vaccine=="Unvaccinated"), x_var="Vaccine", y_var="pi", color_var="lineage_sim", y_lab=expression("Nucleotide diversity ("~pi~")"), x_lab="Vaccine")+theme(axis.title.x = element_blank())
+p3_1 <- p3_1 + scale_color_manual(name="Lineage", values=colors_lineage)
+p3_1_p <- p3_1+
+   ggtitle("C")+
+   geom_signif(y_position = (0.5+seq(0,5)/20)/2000, xmin = c(2.7,2.8,2.8,2.8,2.9,3.1)-2, xmax = c(3.3,3.1,3.2,3.3,3.3,3.3)-2, annotation = c("*","**","*","**","**","**"), color="black", vjust=0.65, tip_length = 0.01)
+
+p_out_upper_1 <- (p1_1_p) + (p2_1+ggtitle("B")) + (p3_1_p) + plot_layout(nrow=1, guides="collect") & theme(legend.position='bottom') & guides(col = guide_legend(nrow = 1))
+ggsave("../results/Figure 2_upper.pdf", width=8, height=4, plot= p_out_upper_1)
+
+## Figure 3 upper
+p1_1 <- plot_box(df_plot=df_plot_n_gene_meta_adj %>% filter(gene=="Full genome", Vaccine!="Unvaccinated"), x_var="Vaccine", y_var="n_per_kb_adj", color_var="lineage_sim", y_lab="Number of iSNVs per Kb (adjusted)", x_lab="Vaccine")+theme(axis.title.x = element_blank())
+p1_1 <- p1_1 + scale_color_manual(name="Lineage", values=colors_lineage, limits = force)
+p1_1_p <- p1_1+
+   ggtitle("A")+
+   geom_signif(y_position = 0.55, xmin = c(0.8), xmax = c(1.2), annotation = c("**"), color="black", vjust=0.65, tip_length = 0.01)
+
+p2_1 <- plot_box(df_snvs_meta_add_qc %>% filter(gene=="Full genome", Vaccine!="Unvaccinated"), x_var="Vaccine", y_var="sec_freq", color_var="lineage_sim", y_lab="MAF", x_lab="Vaccine")+theme(axis.title.x = element_blank())
+p2_1 <- p2_1 + scale_color_manual(name="Lineage", values=colors_lineage, limits = force)
+
+p3_1 <- plot_box(df_plot_pi %>% filter(Vaccine!="Unvaccinated"), x_var="Vaccine", y_var="pi", color_var="lineage_sim", y_lab=expression("Nucleotide diversity ("~pi~")"), x_lab="Vaccine")+theme(axis.title.x = element_blank())
+p3_1 <- p3_1 + scale_color_manual(name="Lineage", values=colors_lineage, limits = force)
+p3_1_p <- p3_1+
+   ggtitle("C")+
+   geom_signif(y_position = (0.65+seq(0,0)/20)/2000, xmin = c(0.8), xmax = c(1.2), annotation = "P=0.068", color="black", vjust=-0.5, tip_length = 0.01,textsize=2.3)
+
+p_out_upper_2 <- (p1_1_p) + (p2_1+ggtitle("B")) + (p3_1_p) + plot_layout(nrow=1, guides="collect") & theme(legend.position='bottom') & guides(col = guide_legend(nrow = 1))
+ggsave("../results/Figure 3_upper.pdf", width=8, height=4, plot= p_out_upper_2)
 
 
 

@@ -11,6 +11,19 @@ load("../results/df_bam_rst_full_notpp.rdata")
 df_meta <- read_csv("../results/df_samples_clean.csv", guess_max = 60000)
 df_orf_sim$length_full <- df_orf_sim$stop-df_orf_sim$start+1
 
+sort(lubridate::dmy(df_meta$collection_date))
+sort(lubridate::dmy(df_meta$`Report date`))
+
+dates_omicron <- df_meta %>% filter(lineage_sim=="Omicron") %>% .$collection_date
+lubridate::dmy(dates_omicron)<="2022-03-01"
+lubridate::dmy(dates_omicron)>="2022-02-27"
+
+dates_omicron <- df_meta %>% filter(lineage_sim=="Omicron") %>% .$`Report date`
+lubridate::dmy(dates_omicron)<="2022-03-01"
+sum(lubridate::dmy(dates_omicron)>="2022-02-27")
+sort(lubridate::dmy(dates_omicron))
+
+
 ## 4. analyse the number of mutations, the frequency of mutations, diversity.
 ### Number of iSNV mutations 
 df_tmp <- df_snvs_meta_add_qc %>% group_by(sample) %>% summarise(n=n())

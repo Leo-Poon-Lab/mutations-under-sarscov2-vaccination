@@ -10,6 +10,7 @@ library(ggpubr)
 library(boot)
 library(parallel)
 library(ggbreak)
+library(RColorBrewer)
 
 source("https://raw.githubusercontent.com/Koohoko/Save-ggplot-to-pptx/main/scripts/save_pptx.r")
 
@@ -17,6 +18,8 @@ colors_lineage=c("#e41a1c", "#33a02c", "#1f78b4", "#ff7f00", "#f781bf", "#666666
 names(colors_lineage) <- c("Alpha", "Delta", "Omicron", "B.1.36", "B.1.36.27", "B.1.1.63")
 colors_vaccine=c("#a65628", "#7570b3", "#999999")
 names(colors_vaccine)=c("BioNTech", "Sinovac", "Non-vaccinated")
+colors_syn <- c(brewer.pal(9, 'Set1')[1], brewer.pal(9, 'Set1')[2], pal_jama()(6)[1])
+names(colors_syn)=c("Nonsynonymous", "Synonymous", "UTR")
 
 load("../results/df_plot_n_gene.rdata")
 load("../results/df_bam_rst_full_notpp.rdata")
@@ -24,6 +27,9 @@ load("../results/df_bam_rst_full_notpp.rdata")
 df_meta <- read_csv("../results/df_samples_clean.csv", guess_max = 60000)
 df_meta$lineage_sim <- factor(df_meta$lineage_sim, levels = names(colors_lineage))
 df_meta$detection_lag <- as.numeric(dmy(df_meta$`Report date`) - dmy(df_meta$`Onset date`))
+df_meta$collection_lag <- as.numeric(dmy(df_meta$collection_date) - dmy(df_meta$`Onset date`))
+wilcox.test(df_meta$collection_lag[df_meta$Vaccine=="Non-vaccinated" & df_meta$lineage_sim %in% c("Delta", "Omicron")], df_meta$collection_lag[df_meta$Vaccine!="Non-vaccinated" & df_meta$lineage_sim %in% c("Delta", "Omicron")]) # P = 0.801
+
 
 df_plot_n_gene$lineage_sim <- factor(df_plot_n_gene$lineage_sim, levels = names(colors_lineage))
 
@@ -52,12 +58,13 @@ sum(df_tmp$n==0)
 df_tmp$Ct_value_break <- cut(df_tmp$Ct_value, 3)
 
 p_n_isnvs <- ggplot(df_tmp) +
-	geom_histogram(aes(x=n, fill=Ct_value_break), binwidth = 1, color="black", size=0.3)+
+	# geom_histogram(aes(x=n, fill=Ct_value_break), binwidth = 1, color="black", size=0.3)+
+	geom_histogram(aes(x=n), binwidth = 1, color="black", size=0.3)+
    geom_vline(aes(xintercept=n_isnvs_mean), linetype="dashed")+
 	xlab("Number of iSNV sites in a sample")+
 	ylab("Number of samples")+
 	scale_x_continuous(breaks=seq(0,30,5))+
-	scale_fill_manual(name="Ct value range", values=pal_jama()(6)[4:6])+
+	# scale_fill_manual(name="Ct value range", values=pal_jama()(6)[4:6])+
 	theme_minimal()+
 	theme(legend.position = "top")+
 	NULL
@@ -71,17 +78,18 @@ p_n_isnvs <- ggplot(df_tmp) +
 
 ## number of recurrent iSNVs 
 table(df_snvs_meta_add_qc$effect_sim)
-df_tmp <- df_snvs_meta_add_qc %>% group_by(X2, effect_sim) %>% summarise(n=n())
-sum(df_tmp$n>1) # 243
-sum(df_tmp$n==1) # 1845
+df_tmp <- df_snvs_meta_add_qc %>% group_by(X2) %>% summarise(n=n())
+sum(df_tmp$n>1) # 257
+sum(df_tmp$n==1) # 1801
 sum(df_tmp$n==1)/nrow(df_tmp)
+df_tmp <- df_snvs_meta_add_qc %>% group_by(X2, effect_sim) %>% summarise(n=n())
 
 p_n_sharing <- ggplot(df_tmp %>% ungroup() %>% group_by(effect_sim,n) %>% summarise(n_group=n(), n_group_log10=log10(n_group))) +
 	# geom_histogram(aes(x=n, fill=effect_sim), binwidth = 1, color="black", size=0.3)+
 	geom_col(aes(x=n, y=n_group, fill=effect_sim), color="black", size=0.3)+
 	xlab("Number of samples sharing iSNVs")+
 	ylab("Number of iSNVs")+
-   scale_fill_manual(name="Variant type", values=pal_jama()(3)[c(3,2,1)])+
+   scale_fill_manual(name="Variant type", values=colors_syn)+
 	theme_minimal()+
 	theme(legend.position = "top")+
 	scale_x_continuous(breaks=seq(0,60,5))+
@@ -154,7 +162,7 @@ df_plot_join$n_per_pos[is.na(df_plot_join$n_per_pos)] <- 0
 df_plot_join$n_per_kb <- df_plot_join$n_per_pos*1000
 write_xlsx(df_plot_join, "../results/iSNVs_incidence_across_genome_more.xlsx")
 
-df_plot_join_n <- df_plot_join %>% select(sample, pos_cut, n_per_kb, Vaccine, lineage_sim, effect_sim) %>% group_by(pos_cut, effect_sim) %>% summarise(n=n(), n_per_kb_mean=mean(n_per_kb))
+df_plot_join_n <- df_plot_join %>% select(sample, pos_cut, n_per_kb, Vaccine, lineage_sim, effect_sim) %>% group_by(pos_cut, effect_sim) %>% summarise(n=n(), n_per_kb_mean=mean(n_per_kb), n_per_kb_sd=sd(n_per_kb))
 
 df_n_s_sites <- read_tsv("../results/snpgenie/BioNTech-Delta/WHP4592/codon_results.txt")
 df_n_s_sites <- df_n_s_sites %>% arrange(site)
@@ -169,19 +177,60 @@ df_plot_join_n$sites <- sapply(seq_len(nrow(df_plot_join_n)), function(i) {
    }
 })
 df_plot_join_n$n_per_sites <- df_plot_join_n$n_per_kb_mean*1000 / df_plot_join_n$sites
+df_plot_join_n$n_per_sites_sd_low <- df_plot_join_n$n_per_sites - df_plot_join_n$n_per_kb_sd
+df_plot_join_n$n_per_sites_sd_high <- df_plot_join_n$n_per_sites + df_plot_join_n$n_per_kb_sd
 
-p1 <- ggplot(df_plot_join_n) +
-	geom_col(aes(x=pos_cut, y=n_per_sites, fill=effect_sim), position=position_dodge(preserve="total"), color="black", size=0.3)+
-	# facet_wrap(vars(lineage_sim), ncol=1)+
-	scale_x_discrete(breaks = levels(df_plot$pos_cut)[seq(1,30,2)], expand = c(0.05,0.05), guide = guide_axis(n.dodge = 2))+
-   scale_fill_manual(name="Variant type", values=pal_jama()(3)[c(3,2,1)])+
+df_plot_join <- left_join(df_plot_join, df_plot_join_n %>% select(pos_cut, effect_sim, sites)) %>% mutate(n_per_kb_per_site=n_per_kb/sites)
+df_tmp <- df_plot_join %>% filter(effect_sim=="Nonsynonymous")
+kruskal.test(df_tmp$n_per_kb_per_site, df_tmp$pos_cut) 
+df_tmp <- df_plot_join %>% filter(effect_sim=="Synonymous")
+kruskal.test(df_tmp$n_per_kb_per_site, df_tmp$pos_cut) 
+
+df_boot <- lapply(unique(df_plot_join$pos_cut), function(pos_cut_i) {
+   # mutation_i <- df_tmp_summary$mutation[1]
+   print(pos_cut_i)
+   rsts <- c()
+   for (effect_i in c("Nonsynonymous", "Synonymous")) {
+      num_adjust <- df_plot_join_n %>% filter(pos_cut==pos_cut_i, effect_sim==effect_i) %>% .$sites
+      mut_function <- function(D, indices, num_adjust) {
+         df_tmp <- D[indices,]
+         mean(df_tmp$n_per_kb[df_tmp$pos_cut==pos_cut_i & df_tmp$effect_sim==effect_i], na.rm = TRUE)/num_adjust
+      }
+      boot_mean <- boot(data = df_plot_join, R = 10000, statistic = mut_function, parallel = 'multicore', ncpus = 2, num_adjust=num_adjust)
+      rst <- c(pos_cut_i, effect_i, boot_mean$t0, sd(boot_mean$t))
+      print(pos_cut_i)
+      print(rst)
+      rsts <- c(rsts, rst)
+   }
+   return(rsts)
+})
+
+df_boot_m <- matrix(unlist(df_boot), ncol=4, byrow=T)
+colnames(df_boot_m) <- c("pos_cut", "Type", "Mean", "SD")
+df_boot_m <- as_tibble(df_boot_m)
+df_boot_m <- df_boot_m %>% mutate_at(vars(`Mean`:`SD`), as.numeric)
+df_boot_m$pos_cut <- rep(levels(df_plot_join$pos_cut), each=2)
+write_tsv(df_boot_m, "../results/df_boot_m_pos_cut_isnvs.tsv")
+df_boot_m <- read_tsv("../results/df_boot_m_pos_cut_isnvs.tsv")
+df_boot_m$pos_cut <- factor(df_boot_m$pos_cut, levels=unique(df_boot_m$pos_cut))
+
+p1 <- ggplot(df_boot_m, aes(x=pos_cut)) +
+	geom_errorbar(mapping =  aes(ymin = Mean-SD, ymax = Mean+SD, color=Type), position = position_dodge(width = 0.5), width = 0, size = 2) +
+   geom_point(mapping =  aes(y = Mean-SD, color=Type ), 
+               position = position_dodge(width = 0.5), size = 1.) + # size = 1
+   geom_point(mapping =  aes(y = Mean+SD, color=Type), 
+               position = position_dodge(width = 0.5), size = 1.2) +
+   geom_point(aes(y=Mean, fill=Type), position = position_dodge(width = 0.5), size=3, shape=21, alpha=0.9) +
+   scale_color_manual(name="Variant type", values=colors_syn[1:2])+   
+   scale_fill_manual(name="Variant type", values=colors_syn[1:2])+   
    theme_minimal()+
-	# theme(axis.text.x = element_text(angle = 30, vjust = 0.5, hjust=1)) +
 	theme(legend.position = "top")+
-	xlab("Genomic positions")+
-	ylab("Average number of iSNVs per\nsynonymous/non-synonymous site")+
+	scale_x_discrete(breaks = unique(df_boot_m$pos_cut)[seq(1,30,2)], expand = c(0.05,0.05), guide = guide_axis(n.dodge = 2))+
+   xlab("Genomic positions")+
+	ylab("iSNVs frequency per sample per Kb per\nsynonymous/non-synonymous site")+
 	NULL
 p1
+ggsave("../results/tmp.pdf")
 
 df_plot_n_more <- df_plot_join %>% select(sample, pos_cut, n_per_kb, Vaccine, lineage_sim, effect_sim, group) %>% group_by(pos_cut, Vaccine, lineage_sim, effect_sim, group) %>% summarise(n=n(), n_per_kb_mean=mean(n_per_kb))
 write_xlsx(df_plot_n_more, "../results/iSNVs_incidence_across_genome_more.xlsx")
@@ -190,7 +239,7 @@ p1_more <- ggplot(df_plot_n_more) +
 	geom_col(aes(x=pos_cut, y=n_per_kb_mean, fill=effect_sim), position=position_dodge(preserve="total"), color="black", size=0.3)+
 	facet_wrap(vars(group), ncol=1)+
 	scale_x_discrete(breaks = levels(df_plot$pos_cut)[seq(1,30,2)], expand = c(0.05,0.05), guide = guide_axis(n.dodge = 2))+
-   scale_fill_manual(name="Variant type", values=pal_jama()(3)[c(3,2,1)])+
+   scale_fill_manual(name="Variant type", values=colors_syn[1:2])+
    theme_minimal()+
 	# theme(axis.text.x = element_text(angle = 30, vjust = 0.5, hjust=1)) +
 	theme(legend.position = "top")+
@@ -220,7 +269,7 @@ df_tmp_summary$mean_adj <- sapply(seq_len(nrow(df_tmp_summary)), function(i) {
 
 df_tmp <- df_tmp %>% select(-REF, -ALT)
 
-df_boot <- mclapply(unique(df_tmp_summary$mutation), function(mutation_i) {
+df_boot <- mclapply(unique(df_tmp$mutation), function(mutation_i) {
    # mutation_i <- df_tmp_summary$mutation[1]
    print(mutation_i)
    rsts <- c()
@@ -244,6 +293,8 @@ colnames(df_boot_m) <- c("Mutation", "Type", "Mean", "SD")
 df_boot_m <- as_tibble(df_boot_m)
 df_boot_m <- df_boot_m %>% mutate_at(vars(`Mean`:`SD`), as.numeric)
 df_boot_m$Mutation <- gsub("T", "U", df_boot_m$Mutation)
+write_tsv(df_boot_m, "../results/df_boot_m_mutation_isnvs.tsv")
+
 p_mut_type_boot <- ggplot(df_boot_m, aes(x=Mutation)) +
    geom_errorbar(mapping =  aes(ymin = Mean-SD, ymax = Mean+SD, color=Type), position = position_dodge(width = 0.5), width = 0, size = 2) +
     geom_point(mapping =  aes(y = Mean-SD, color=Type ), 
@@ -252,14 +303,13 @@ p_mut_type_boot <- ggplot(df_boot_m, aes(x=Mutation)) +
                position = position_dodge(width = 0.5), size = 1.2) +
    geom_point(aes(y=Mean, fill=Type), position = position_dodge(width = 0.5), size=3, shape=21, alpha=0.9) +
    geom_hline(aes(yintercept=mean_adj, color=effect_sim), data=df_tmp_summary, linetype="dashed")+
-    scale_color_manual(name="Variant type", values=pal_jama()(3)[c(3,2)])+   
-    scale_fill_manual(name="Variant type", values=pal_jama()(3)[c(3,2)])+   
+    scale_color_manual(name="Variant type", values=colors_syn[1:2])+   
+    scale_fill_manual(name="Variant type", values=colors_syn[1:2])+   
    theme_minimal()+
 	theme(legend.position = "top")+
    ylab("iSNVs frequency per sample per\nsynonymous/non-synonymous site")+
     NULL
 p_mut_type_boot
-
 
 ### Proportion of samples share iSNVs
 df_plot <- df_snvs_meta_add_qc
@@ -270,19 +320,21 @@ df_plot_n_mut$prop <- df_plot_n_mut$n/df_tmp$n_group
 df_plot_n_mut$mutation <- paste0(df_plot_n_mut$mutation, " (", gsub("p.", "", df_plot_n_mut$mut_aa, fixed=T), ", N=", df_plot_n_mut$n, ")")
 
 p2 <- ggplot(df_plot_n_mut) +
-	geom_point(aes(x=X2, y=prop, color=effect_sim), position="identity")+
-	geom_point(aes(x=X2, y=prop), color="black", position="identity", shape=21, stroke=0.2)+
+	geom_point(aes(x=X2, y=prop, fill=effect_sim), position="identity", shape=21, alpha=0.8)+
+	# geom_point(aes(x=X2, y=prop), color="black", position="identity", shape=21, stroke=0.2)+
 	# facet_wrap(vars(lineage_sim), ncol=1)+
 	scale_x_continuous(breaks = breaks_geneome[seq(1,n_breaks,2)])+
 	theme_minimal()+
 	xlab("Genomic positions")+
-   scale_color_manual(name="Variant type", values=pal_jama()(3)[c(3,2,1)])+   
-	ylab("Proportion of samples sharing iSNVs")+
+   scale_color_manual(name="Variant type", values=colors_syn)+   
+   scale_fill_manual(name="Variant type", values=colors_syn)+   
+	ylab("Frequency of iSNVs across samples")+
 	theme(legend.position = "top")+
 	geom_text_repel(aes(x=X2, y=prop, label=mutation), data = . %>% filter(prop>0.01))+
 	# theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
 	NULL
 p2
+ggsave("../results/tmp.pdf")
 
 df_tmp <- df_plot %>% filter(mut_aa %in% (df_plot_n_mut %>% filter(prop>0.01) %>% .$mut_aa)) %>% group_by(mut_aa) %>% mutate(n_mut = n()) %>% group_by(lineage_sim,Vaccine, gene, mut_aa) %>% summarise(prop_mut=n()/n_mut[1]) %>% arrange(mut_aa, desc(prop_mut)) %>% ungroup() %>% mutate(mut_aa=gsub("p.", "", mut_aa, fixed=T))
 write_csv(df_tmp, "../results/shared_isnvs_in_different_groups.csv")
@@ -314,7 +366,7 @@ p_genes <- ggplot(
 
 ### combine figures
 p_out_top <- (p_n_isnvs+ggtitle("A"))|(print(p_n_sharing+ggtitle("B"))) 
-p_out_bottom <- (p_mut_type_boot+ggtitle("C"))/(p1+ggtitle("D"))/(p2+ggtitle("E"))/(p_genes+ggtitle("F")) + plot_layout(heights = c(1, 1, 1, 0.3)) 
+p_out_bottom <- (p_mut_type_boot+ggtitle("C"))/(p1+ggtitle("D"))/(p2+ggtitle("E"))/(p_genes) + plot_layout(heights = c(1, 1, 1, 0.3)) 
 # p_out <- ((p_n_isnvs+ggtitle("A"))|(p_n_sharing+ggtitle("B")))/((p_depth+ggtitle("C"))/(p1+ggtitle("D"))/(p2+ggtitle("E"))) + plot_layout(heights = c(1, 3))
 p_out <- p_out_top/p_out_bottom + plot_layout(heights = c(1, 3.5)) 
 ggsave("../results/Figure 1.pdf",height=15,width=15/sqrt(2))
