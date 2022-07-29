@@ -16,6 +16,7 @@ source("https://raw.githubusercontent.com/Koohoko/Save-ggplot-to-pptx/main/scrip
 
 colors_lineage=c("#e41a1c", "#33a02c", "#1f78b4", "#ff7f00", "#f781bf", "#666666") 
 names(colors_lineage) <- c("Alpha", "Delta", "Omicron", "B.1.36", "B.1.36.27", "B.1.1.63")
+colors_lineage <- colors_lineage[c(3,2,1,5,4,6)]
 colors_vaccine=c("#a65628", "#7570b3", "#999999")
 names(colors_vaccine)=c("BioNTech", "Sinovac", "Non-vaccinated")
 df_orf_sim <- read_csv("../data/ORF_SCoV2_sim.csv")
@@ -24,6 +25,18 @@ df_meta <- read_csv("../results/df_samples_clean.csv", guess_max = 60000)
 df_meta$lineage_sim <- factor(df_meta$lineage_sim, levels = names(colors_lineage))
 df_meta$Vaccine <- factor(df_meta$Vaccine, levels = names(colors_vaccine))
 df_meta$detection_lag <- as.numeric(dmy(df_meta$`Report date`) - dmy(df_meta$`Onset date`))
+
+df_meta$Classification_sim <- ifelse(grepl("ocal", df_meta$Classification), "Local", "Imported")
+table(df_meta$Vaccine, df_meta$Classification_sim, df_meta$lineage_sim)
+df_tmp <- df_meta %>% filter(lineage_sim %in% c("Alpha", "Delta")) %>% filter(Vaccine == "Non-vaccinated")
+table(df_tmp$lineage_sim, df_tmp$Classification)
+table(df_tmp$Classification)
+range(dmy(df_tmp$collection_date))
+
+df_tmp <- df_meta %>% filter(lineage_sim %in% c("Omicron"))
+table(sapply(strsplit(df_tmp$lineage, ".", fixed=T), function(x) {x[2]}))
+table(df_tmp$Classification)
+range(dmy(df_tmp$collection_date))
 
 df_snvs_meta_add_qc <- read_csv("../results/df_snvs_meta_add_qc_bam.csv", guess_max=600000)
 samples_analysed <- unique(df_snvs_meta_add_qc$sample)
@@ -705,7 +718,7 @@ sum(df_tmp$N)
 labels <- gsub("^Non-", "Un", labels)
 intrahost_results_bootstrap_LONG$outbreak_ori <- intrahost_results_bootstrap_LONG$outbreak 
 # intrahost_results_bootstrap_LONG$outbreak <- intrahost_results_bootstrap_LONG$outbreak_ori
-intrahost_results_bootstrap_LONG$outbreak <- factor(intrahost_results_bootstrap_LONG$outbreak, levels = c("Combined", "BioNTech Delta", "BioNTech Omicron", "Sinovac Delta", "Sinovac Omicron", "Non-vaccinated Alpha", "Non-vaccinated Delta", "Non-vaccinated Omicron", "Non-vaccinated B.1.36", "Non-vaccinated B.1.36.27", "Non-vaccinated B.1.1.63"), labels=c("Combined\n(N=2053)", labels))
+intrahost_results_bootstrap_LONG$outbreak <- factor(intrahost_results_bootstrap_LONG$outbreak_ori, levels = c("Combined", paste0(df_tmp$Vaccine, " ", df_tmp$lineage_sim)), labels=c("Combined\n(N=2053)", labels))
 
 
 # For horizontal lines

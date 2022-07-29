@@ -476,7 +476,8 @@ p_maf <- ggscatter(df_snvs_meta_add_qc_adj %>% filter(gene=="Full genome"), x = 
    stat_cor(method = "pearson", label.x = 0, label.y = 0.6)+
    NULL
 
-p_out <- ((p_pre+ggtitle("A"))/(p_maf+ggtitle("C"))/(p_aft+ggtitle("E")))|((p_pre2+ggtitle("B"))/(p_out_lag+ggtitle("D"))/(p_aft2+ggtitle("F")))
+# p_out <- ((p_pre+ggtitle("A"))/(p_maf+ggtitle("C"))/(p_aft+ggtitle("E")))|((p_pre2+ggtitle("B"))/(p_out_lag+ggtitle("D")))
+p_out <- ((p_pre+ggtitle("A"))|(p_out_lag+ggtitle("B")))/(p_pre2+ggtitle("C")|(p_maf+ggtitle("D")))/(p_aft+ggtitle("E"))
 ggsave("../results/n_per_kb_adjusted.pdf", width=10, height=10)
 
 # ggscatter(df_snvs_meta_add_qc_adj %>% filter(gene=="Full genome"), x = "Ct_value", y = "sec_freq_adj",
