@@ -7,7 +7,7 @@ library(ggrepel)
 library(slider)
 library(ggsci)
 
-df_samples <- read_csv("../data/df_samples.csv")
+df_samples <- read_csv("../results/df_samples_clean.csv")
 
 # QC
 files_rc <- list.files("../../../2020/2020-09-01_COVID_NGS_pipeline/COVID_NGS_pipeline_results_shared/read_count/", full.names = T)
@@ -49,11 +49,11 @@ ggsave("../results/coverage.pdf", width = 10, height = 8)
 
 # Consensus sequence
 file_consensus_full <- list.files("../../../2020/2020-09-01_COVID_NGS_pipeline/COVID_NGS_pipeline_results_shared/ivar_consensus/", full.names=T)
+tmp <- paste0("../../../2020/2020-09-01_COVID_NGS_pipeline/COVID_NGS_pipeline_results_shared/ivar_consensus//", df_samples$Sample, "_consensus.fa" )
 check <- sapply(file_consensus_full, function(x){
-	any(sapply(df_samples$Sample, function(y){grepl(paste0(y, "_c"), x)}))
+	x %in% tmp
 })
 files_consensus_filter <- file_consensus_full[check]
-files_consensus_filter <- files_consensus_filter[!grepl("iseq", files_consensus_filter)]
 files_consensus_filter <- sort(files_consensus_filter, decreasing = T)
 
 seqs <- lapply(files_consensus_filter, function(x){
@@ -61,11 +61,40 @@ seqs <- lapply(files_consensus_filter, function(x){
 })
 seqs <- do.call(c, seqs)
 
+names_new <- gsub("^Consensus_", "", names(seqs))
+names_new <- gsub("_consensus.+", "", names_new)
+names(seqs) <- names_new
+
 ## align to ref
 file_seq <- "../results/seqs.fasta"
-file_seq_aln <- "../results/seqs_aln.fasta"
 writeXStringSet(seqs, file_seq)
-system(paste0("mafft --auto --maxiterate 1000 --thread 8 --keeplength --addfragments ", file_seq, " ../results/ref_seq.fasta > ", file_seq_aln))
-system(paste0("pangolin ", file_seq_aln, " --outfile ../results/lineage.csv")) 
-seq_aln <- readDNAStringSet("../results/seqs_aln.fasta")
 
+# file_seq_aln <- "../results/seqs_aln.fasta"
+# system(paste0("mafft --auto --maxiterate 1000 --thread 8 --keeplength --addfragments ", file_seq, " ../results/ref_seq.fasta > ", file_seq_aln))
+# system(paste0("pangolin ", file_seq_aln, " --outfile ../results/lineage.csv")) 
+# seq_aln <- readDNAStringSet("../results/seqs_aln.fasta")
+
+system("chmod 755 ./helper/run_nextclade.sh ")
+system("./helper/run_nextclade.sh ../results/seqs.fasta ../results/nextclade/")
+
+df_samples$group <- paste(df_samples$Vaccine, df_samples$lineage_sim)
+df_samples <- df_samples %>% mutate(group=gsub("Non-", "Un", group))
+
+# sapply(unique(df_samples$group), function(group_i){
+# 	samples_i <- df_samples$sample[df_samples$group==group_i]
+# 	seqs_i <- seqs[names(seqs) %in% samples_i]
+# 	stopifnot(length(seqs_i)==length(samples_i))
+# 	group_i_no_space <- gsub(" ", "_", group_i)
+# 	file_seq_i <- paste0("../results/seqs_", group_i_no_space, ".fasta")
+# 	writeXStringSet(seqs_i, file_seq_i)
+# 	system(paste0("./helper/run_nextclade.sh ", file_seq_i, " ../results/nextclade_", group_i_no_space, "/"))
+# })
+
+seqs_new_name <- seqs
+names(seqs_new_name) <- sapply(names(seqs_new_name), function(sample_i){
+	tmp <- paste(df_samples$group[df_samples$sample==sample_i], sample_i)
+	gsub(" ", "_", tmp)
+})
+file_seq_rename <- "../results/seqs_rename.fasta"
+writeXStringSet(seqs_new_name[order(names(seqs_new_name))], file_seq_rename)
+system(paste0("./helper/run_nextclade.sh ", file_seq_rename, " ../results/nextclade_rename/"))
