@@ -9,7 +9,6 @@ library(ggsci)
 
 ## 1. Local cases;
 # data_meta_study1 <- read_csv("../data/df_samples_first_version.csv") 
-data_meta_study1 <- read_csv("../results/df_samples_clean_first_version.csv") # in the first version of the manuscript, we have 2053 samples passed 
 data_meta_raw <- read_csv("../../../2021/2021-06-24_merge_metadata/results/cleaned_metadata.csv", guess_max = 2000000)
 
 data_meta <- data_meta_raw %>% filter(sequenced_by_us) %>% filter(!is.na(`Report date`)) %>% filter(!is.na(case_id))
@@ -114,7 +113,14 @@ df_meta$total_seqs_after_trimming <- get_total_seqs_after_trimming(df_meta$Sampl
 sum(as.numeric(df_meta$total_seqs_after_trimming)<50000, na.rm=T)
 df_meta <- df_meta %>% filter(Ct_value<=28 | is.na(Ct_value)) # remove all samples with Ct_value > 28
 
+
 ## compare to version 1
+data_meta_study1 <- read_csv("../results/df_samples_clean_first_version.csv") # in the first version of the manuscript, we have 2053 samples passed 
+
+write_csv(df_meta, "../results/df_samples.csv")
+df_meta <- read_csv("../results/df_samples.csv", guess_max=100000)
+df_meta <- df_meta %>% filter(lineage_sim != "22B (Omicron, BA.5.*)")
+
 data_meta_study1$Vaccine <- factor(data_meta_study1$Vaccine, levels=c("BioNTech", "Sinovac", "Non-vaccinated"))
 
 table(df_meta$lineage_sim, df_meta$Vaccine)
@@ -141,4 +147,3 @@ sum(table(df_meta$lineage_sim, df_meta$Vaccine)[1,])-sum(table(data_meta_study1$
 # difference in number of B.1.1.63 samples
 sum(table(df_meta$lineage_sim, df_meta$Vaccine)[2,])-sum(table(data_meta_study1$lineage_sim, data_meta_study1$Vaccine)[2,])
 
-write_csv(df_meta, "../results/df_samples.csv")

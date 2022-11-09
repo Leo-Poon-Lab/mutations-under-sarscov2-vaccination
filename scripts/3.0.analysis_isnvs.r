@@ -12,6 +12,7 @@ library(parallel)
 source("https://raw.githubusercontent.com/Koohoko/Save-ggplot-to-pptx/main/scripts/save_pptx.r")
 
 df_meta <- read_csv("../results/df_samples.csv", guess_max=100000)
+df_meta <- df_meta %>% filter(lineage_sim != "22B (Omicron, BA.5.*)")
 
 # table(df_meta$lineage)
 # table(df_meta$lineage_sim)
