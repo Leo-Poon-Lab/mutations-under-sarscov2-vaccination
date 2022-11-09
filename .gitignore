@@ -1,5 +1,7 @@
 /data/*
 /results/*
+/results_005/*
+/scripts_005/*
 /draft/*
 *.zip
 .DS_Store

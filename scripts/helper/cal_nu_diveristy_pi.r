@@ -30,11 +30,11 @@ Cal_pi <- function(dls, length_genome) {
 
 # The below scripts use SNPGenie for calculation of pi
 dir.create("../results/snpgenie/")
-Generate_cvf_files <- function(df_mut_t) {
-	df_vcf <- tibble('#CHROM' = "MN908947.3", POS=df_mut_t$X2)
+Generate_cvf_files <- function(df_mut_t, pos_name="pos", ref_name="con_base", alt_name="sec_base") {
+	df_vcf <- tibble('#CHROM' = "MN908947.3", POS=df_mut_t[[pos_name]])
 	df_vcf$ID <- "."
-	df_vcf$REF <- df_mut_t$X4
-	df_vcf$ALT <- df_mut_t$X5
+	df_vcf$REF <- df_mut_t[[ref_name]]
+	df_vcf$ALT <- df_mut_t[[alt_name]]
 	df_vcf$QUAL <- 30
 	df_vcf$FILTER <- "PASS"
 	df_vcf$INFO <- paste0("DP=", df_mut_t$con_fwd+df_mut_t$con_rev+df_mut_t$sec_fwd+df_mut_t$sec_rev, ";", "AF=", df_mut_t$sec_freq)

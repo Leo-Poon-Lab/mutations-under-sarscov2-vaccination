@@ -2,12 +2,13 @@ library(tidyverse)
 library(parallel)
 library(ggsci)
 
-data_meta_raw <- read_csv("../../../2021/2021-06-24_merge_metadata/results/cleaned_metadata.csv", guess_max = 20000)
-data_meta_raw <- data_meta_raw %>% filter(sequenced_by_us) %>% filter(!is.na(`Report date`))
+data_meta_raw_ori <- read_csv("../../../2021/2021-06-24_merge_metadata/results/cleaned_metadata.csv", guess_max = 200000)
+data_meta_raw <- data_meta_raw_ori %>% filter(sequenced_by_us) %>% filter(!is.na(`Report date`))
 
-data_meta_study <- read_csv("../results/df_samples_clean.csv")
+# data_meta_study <- read_csv("../data/df_samples.csv", guess_max = 20000)
+data_meta_study <- read_csv("../results/df_samples_clean.csv", guess_max = 20000)
 
-data_meta_raw <- data_meta_raw %>% filter(Sample %in% data_meta_study$sample)
+data_meta_raw <- data_meta_raw %>% filter(Sample %in% data_meta_study$Sample)
 data_meta_raw <- data_meta_raw %>% filter(grepl(",", samples_all, fixed=T))
 data_meta_raw$num_whp <- sapply(data_meta_raw$samples_all, function(x){
 	tmp <- strsplit(x, ", ")[[1]]
@@ -23,6 +24,19 @@ samples_controls_whp_id <- gsub("RE-", "", samples_controls)
 samples_controls_whp_id <- gsub("-.+", "", samples_controls_whp_id)
 duplicated_samples_whpids <- names(table(samples_controls_whp_id)[table(samples_controls_whp_id)>1])
 samples_controls <- samples_controls[samples_controls_whp_id %in% duplicated_samples_whpids]
+
+df_samples_controls <- tibble(sample=samples_controls, whp_id=gsub("[-_].+", "", samples_controls))
+df_samples_controls$sequencer <- ifelse(grepl("-S",df_samples_controls$sample), "iSeq", "Novaseq")
+df_vm_id <- read_tsv("../../../2021/2021-06-24_merge_metadata/results/data_seqed_vm_id.tsv")
+df_samples_controls <- left_join(df_samples_controls, df_vm_id, "whp_id")
+
+df_samples_controls_summary <- df_samples_controls %>% group_by(case_id) %>% summarise(n=n(), n_sequencer=length(unique(sequencer)), diff_collection_date=max(collection_date)-min(collection_date)) 
+df_samples_controls_summary %>% filter(n_sequencer>1)
+df_samples_controls_summary %>% filter(diff_collection_date>0) %>% left_join(data_meta_study  %>% mutate(case_id = as.character(case_id)) %>% select(case_id, Vaccine, lineage_sim))
+df_samples_controls_summary %>% filter(diff_collection_date>0) %>% left_join(data_meta_study  %>% mutate(case_id = as.character(case_id)) %>% select(case_id, Vaccine, lineage_sim)) %>% filter(diff_collection_date<=2)
+
+df_samples_controls %>% filter(case_id %in% c(12120, 12314))
+
 
 source("./helper/pysamstats.r")
 # read bamreadcounts of the control samples
