@@ -7,6 +7,7 @@ library(parallel)
 df_orf_sim <- read_csv("../data/ORF_SCoV2_sim.csv")
 df_snvs_meta_add_qc <- read_csv("../results/df_snvs_meta_add_qc_bam.csv", guess_max=60000)
 df_meta <- read_csv("../results/df_samples.csv", guess_max=100000)
+df_meta <- df_meta %>% filter(lineage_sim != "22B (Omicron, BA.5.*)")
 df_orf_sim$length_full <- df_orf_sim$stop-df_orf_sim$start+1
 
 load("../results/df_bam_rst_full_notpp.rdata")
@@ -58,7 +59,6 @@ df_plot_n_gene$n[is.na(df_plot_n_gene$n)] <- 0
 df_plot_n_gene$n_per_kb[is.na(df_plot_n_gene$n_per_kb)] <- 0
 save(df_plot_n_gene, file="../results/df_plot_n_gene.rdata")
 
-
 ### Diversity of samples
 #### we use nucleotide diversity pi here (Ref: https://academic.oup.com/ve/article/5/1/vey041/5304643, https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4316684/)
 source("./helper/cal_nu_diveristy_pi.r")
@@ -100,6 +100,8 @@ commands <- mclapply(seq_len(nrow(df_tmp)), function(i){
 ### parallel running
 # snpgenie.pl --fastafile=chr21.fa --gtffile=chr21_genes.gtf --snpreport=chr21_GATK.vcf -vcfformat=4 --minfreq=0.001 --workdir=/home/ohta/human/data/ --outdir=SNPGenie_Results
 commands <- unlist(commands)
+
+# system(commands[grep("WHP3907", commands)])
 
 groups <- cut(seq_len(length(commands)), 10)
 batch_cmds <- sapply(seq_along(levels(groups)), function(i) {

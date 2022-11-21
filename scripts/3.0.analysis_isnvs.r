@@ -14,20 +14,16 @@ source("https://raw.githubusercontent.com/Koohoko/Save-ggplot-to-pptx/main/scrip
 df_meta <- read_csv("../results/df_samples.csv", guess_max=100000)
 df_meta <- df_meta %>% filter(lineage_sim != "22B (Omicron, BA.5.*)")
 
-# table(df_meta$lineage)
-# table(df_meta$lineage_sim)
-# table(df_meta$Vaccine)
-
 # quantile(df_meta$Ct_value, (1:100)/100, na.rm=T)
 # df_meta %>% filter(is.na(Ct_value)) %>% group_by(lineage_sim) %>% summarise(n())
 stopifnot(max(df_meta$Ct_value, na.rm=T)<=28)
 
-table(df_meta$lineage_sim, df_meta$Vaccine, df_meta$Doses)
-table(df_meta$Vaccine)
-table(df_meta$lineage_sim, df_meta$Vaccine)
+# table(df_meta$lineage_sim, df_meta$Vaccine, df_meta$Doses)
+# table(df_meta$Vaccine)
+# table(df_meta$lineage_sim, df_meta$Vaccine)
 
 ### using pysamstats
-system("conda run -n base pysamstats --help")
+# system("conda run -n base pysamstats --help")
 source("./helper/pysamstats.r")
 
 files_bam_rst_full <- c(list.files("../results/pysamstats/", "tsv$", full.names = T), list.files("../../../2020/2020-09-01_COVID_NGS_pipeline/COVID_NGS_pipeline_results_shared/pysamstats/", "tsv$", full.names = T), list.files("~/../../Volumes/Backup/Haogao/work/2020/2020-09-01_COVID_NGS_pipeline/results/pysamstats/", "tsv$", full.names = T))

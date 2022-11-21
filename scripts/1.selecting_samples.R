@@ -65,7 +65,7 @@ df_meta$lineage_sim <- df_meta$nextstrain_lineage
 df_meta$lineage_sim <- gsub(",V1", "", df_meta$lineage_sim)
 df_meta$lineage_sim[df_meta$lineage_sim=="20A"] <- "20A (B.1.36.*)"
 df_meta$lineage_sim[df_meta$lineage_sim=="20B"] <- "20B (B.1.1.63)"
-df_meta$lineage_sim[df_meta$lineage_sim=="21J (Delta)"] <- "21M (Delta, B.1.617.2.*)"
+df_meta$lineage_sim[df_meta$lineage_sim=="21J (Delta)"] <- "21J (Delta, B.1.617.2.*)"
 df_meta$lineage_sim[df_meta$lineage_sim=="21M (Omicron)"] <- "21M (Omicron, BA.2.*)"
 df_meta$lineage_sim[df_meta$lineage_sim=="22B (Omicron)"] <- "22B (Omicron, BA.5.*)"
 table(df_meta$lineage_sim)
@@ -119,6 +119,7 @@ data_meta_study1 <- read_csv("../results/df_samples_clean_first_version.csv") # 
 
 write_csv(df_meta, "../results/df_samples.csv")
 df_meta <- read_csv("../results/df_samples.csv", guess_max=100000)
+df_meta$lineage_sim[df_meta$lineage_sim=="21M (Delta, B.1.617.2.*)"] <- "21J (Delta, B.1.617.2.*)"
 df_meta <- df_meta %>% filter(lineage_sim != "22B (Omicron, BA.5.*)")
 
 data_meta_study1$Vaccine <- factor(data_meta_study1$Vaccine, levels=c("BioNTech", "Sinovac", "Non-vaccinated"))
@@ -137,7 +138,7 @@ sum(df_meta$Doses==0)
 sum(df_meta$Doses==2)
 sum(df_meta$Doses==3)
 # number of newly added vaccinated Omicron samples
-sum(table(df_meta$lineage_sim, df_meta$Vaccine)[5:6,1:2])-sum(table(data_meta_study1$lineage_sim, data_meta_study1$Vaccine)[6,1:2])
+sum(table(df_meta$lineage_sim, df_meta$Vaccine)[5,1:2])-sum(table(data_meta_study1$lineage_sim, data_meta_study1$Vaccine)[6,1:2])
 # number of newly added vaccinated Delta samples
 sum(table(df_meta$lineage_sim, df_meta$Vaccine)[4,1:2])-sum(table(data_meta_study1$lineage_sim, data_meta_study1$Vaccine)[5,1:2])
 # number of newly added Alpha samples

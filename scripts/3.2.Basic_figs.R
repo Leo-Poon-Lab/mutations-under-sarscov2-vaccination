@@ -17,8 +17,9 @@ load("../results/df_plot_n_gene.rdata")
 load("../results/df_bam_rst_full_notpp.rdata")
 
 df_meta <- read_csv("../results/df_samples.csv", guess_max=100000)
-lineages_all <- sort(unique(df_meta$lineage_sim))
-colors_lineage=rev(c("#e6ab02", "#4daf4a", "#984ea3", "#ff7f00", "#f781bf", "#666666"))
+df_meta <- df_meta %>% filter(lineage_sim != "22B (Omicron, BA.5.*)")
+(lineages_all <- sort(unique(df_meta$lineage_sim)))
+colors_lineage=rev(c("#4daf4a", "#984ea3", "#ff7f00", "#f781bf", "#666666"))
 names(colors_lineage) <- lineages_all
 vaccine_all <- sort(unique(df_meta$Vaccine))
 colors_vaccine=c("#a65628", "#7570b3", "#999999")
@@ -32,6 +33,9 @@ df_meta$detection_lag <- as.numeric(df_meta$`Report date` - ymd(df_meta$`Onset d
 df_meta$collection_lag <- as.numeric(df_meta$collection_date - ymd(df_meta$`Onset date`))
 df_meta$collection_lag[df_meta$collection_lag>100] <- NA # one ourlier
 df_meta$collection_lag[df_meta$collection_lag<0] <- NA # one ourlier
+
+df_meta$vaccine_doses <- paste0(df_meta$Vaccine, " (Doses=", df_meta$Doses, ")")
+df_meta$vaccine_doses[df_meta$Vaccine=="Unvaccinated"] <- "Unvaccinated"
 
 ggplot(df_meta) + geom_boxplot(aes(x=lineage_sim, y=detection_lag, color=Vaccine))
 ggplot(df_meta) + geom_boxplot(aes(x=lineage_sim, y=collection_lag, color=Vaccine)) # collection_lag are similar between groups
@@ -51,6 +55,9 @@ df_snvs_meta_add_qc$effect_sim[grepl("&synonymous", df_snvs_meta_add_qc$effect_s
 df_snvs_meta_add_qc$effect_sim <- gsub("_", " ", df_snvs_meta_add_qc$effect_sim)
 df_snvs_meta_add_qc$effect_sim[grepl("stream", df_snvs_meta_add_qc$effect_sim)] <- "UTR"
 df_snvs_meta_add_qc$effect_sim[!df_snvs_meta_add_qc$in_gene] <- "UTR"
+df_snvs_meta_add_qc <- left_join(df_snvs_meta_add_qc, df_meta %>% select(sample, Doses), "sample")
+df_snvs_meta_add_qc$vaccine_doses <- paste0(df_snvs_meta_add_qc$Vaccine, " (Doses=", df_snvs_meta_add_qc$Doses, ")")
+df_snvs_meta_add_qc$vaccine_doses[df_snvs_meta_add_qc$Vaccine=="Unvaccinated"] <- "Unvaccinated"
 
 # unique(df_snvs_meta_add_qc$effect_sim)
 # df_snvs_meta_add_qc %>% group_by(effect_sim) %>% summarise(n=n(), prop=n/nrow(df_snvs_meta_add_qc))
@@ -133,15 +140,15 @@ ggsave("../results/depth.pdf", width=10, height=6, plot=p_depth)
 ### Average number of iSNVs per Kb
 df_plot <- df_snvs_meta_add_qc
 length(unique(df_snvs_meta_add_qc$mutation))
-df_tmp <- df_snvs_meta_add_qc %>% select(sample, Vaccine, lineage_sim, mutation) %>% unique() %>% group_by(Vaccine, lineage_sim) %>% summarise(N_sites=n())
-df_meta %>% group_by(Vaccine, lineage_sim) %>% summarise(N_samples=n()) %>% left_join(df_tmp)
+df_tmp <- df_snvs_meta_add_qc %>% select(sample, vaccine_doses, lineage_sim, mutation) %>% unique() %>% group_by(vaccine_doses, lineage_sim) %>% summarise(N_sites=n())
+df_meta %>% group_by(vaccine_doses, lineage_sim) %>% summarise(N_samples=n()) %>% left_join(df_tmp)
 
-df_tmp <- df_snvs_meta_add_qc %>% mutate(site=pos, consensus_base=con_base, secondary_base=sec_base) %>% select(sample, Vaccine, lineage_sim, site, gene, consensus_base, secondary_base, mut_aa) %>% group_by(Vaccine, lineage_sim, site, gene, consensus_base, secondary_base, mut_aa) %>% summarise(N_samples_with_mutation_in_group=n()) 
-df_out <- df_meta %>% mutate(group=paste(Vaccine, lineage_sim)) %>% group_by(Vaccine, lineage_sim, group) %>% summarise(N_samples_in_group=n()) %>% left_join(df_tmp %>% select(N_samples_with_mutation_in_group, everything())) %>% ungroup() %>% select(-Vaccine, -lineage_sim)
+df_tmp <- df_snvs_meta_add_qc %>% mutate(site=pos, consensus_base=con_base, secondary_base=sec_base) %>% select(sample, vaccine_doses, lineage_sim, site, gene, consensus_base, secondary_base, mut_aa) %>% group_by(vaccine_doses, lineage_sim, site, gene, consensus_base, secondary_base, mut_aa) %>% summarise(N_samples_with_mutation_in_group=n()) 
+df_out <- df_meta %>% mutate(group=paste(vaccine_doses, lineage_sim)) %>% group_by(vaccine_doses, lineage_sim, group) %>% summarise(N_samples_in_group=n()) %>% left_join(df_tmp %>% select(N_samples_with_mutation_in_group, everything())) %>% ungroup() %>% select(-vaccine_doses, -lineage_sim)
 df_out$mut_aa <- gsub("^p\\.", "", df_out$mut_aa)
 write_tsv(df_out, "../results/identified_minor_variants_in_groups.tsv")
 
-df_samples_high_n <- df_snvs_meta_add_qc %>% group_by(sample) %>% summarise(n=n()) %>% filter(n>10)
+df_samples_high_n <- df_snvs_meta_add_qc %>% group_by(sample) %>% summarise(n=n()) %>% filter(n>100)
 df_samples_high_n_mut <- df_snvs_meta_add_qc %>% mutate(group=paste(Vaccine, lineage_sim)) %>% filter(sample %in% df_samples_high_n$sample) %>% mutate(site=pos, consensus_base=con_base, secondary_base=sec_base) %>% select(sample, group, site, gene, consensus_base, secondary_base, mut_aa, sec_freq) %>% arrange(sample, site)
 unique(df_samples_high_n_mut$sample)
 range(df_samples_high_n_mut$sec_freq)
@@ -321,7 +328,7 @@ ggsave("../results/tmp.pdf")
 
 ### Proportion of samples share iSNVs
 df_plot <- df_snvs_meta_add_qc
-df_plot$mutation <- paste0(df_plot$X4, df_plot$pos, df_plot$X5)
+df_plot$mutation <- paste0(df_plot$con_base, df_plot$pos, df_plot$sec_base)
 df_plot_n_mut <- df_plot %>% select(effect_sim, sample, gene, pos, mutation, mut_aa,  Vaccine, lineage_sim) %>% group_by(pos, mutation, gene, mut_aa, effect_sim) %>% summarise(n=n()) %>% ungroup()
 df_tmp <- df_meta %>% summarise(n_group=n()) %>% ungroup()
 df_plot_n_mut$prop <- df_plot_n_mut$n/df_tmp$n_group
@@ -388,101 +395,17 @@ table(df_meta$lineage_sim, df_meta$Vaccine)
 ## Correlation to Ct values and detection lag
 df_plot_n_gene_meta <- left_join(df_plot_n_gene, df_meta %>% select(Sample, detection_lag, collection_lag, Ct_value, days_since_last_dose) %>% mutate(sample=Sample), "sample") 
 
-add_residuals <- function(df,x_var,y_var,out_var){
-	genes = unique(df$gene)
-	df_out <- lapply(seq_along(genes), function(i) {
-		gene_i <- genes[i]
-		df_tmp <- df %>% filter(gene==gene_i) 
-		df_tmp <- df_tmp[!is.na(df_tmp[[x_var]]),]
-		df_tmp <- df_tmp[!is.na(df_tmp[[y_var]]),]
-		lm_i <- lm(paste0(y_var,"~",x_var), data=df_tmp)
-		df_tmp[[out_var]] <- lm_i$residuals
-		df_tmp
-	})
-	bind_rows(df_out)
-}
+df_plot_n_gene_meta$Ct_value[is.na(df_plot_n_gene_meta$Ct_value)] <- mean(df_plot_n_gene_meta$Ct_value, na.rm = TRUE)
+
+source("./helper/plot_reg.R")
 
 df_plot_n_gene_meta_adj <- add_residuals(df_plot_n_gene_meta, x_var = "Ct_value", y_var = "n_per_kb", out_var = "n_per_kb_adj")
 if(!("Ct_value" %in% names(df_snvs_meta_add_qc))){
    df_snvs_meta_add_qc <- left_join(df_snvs_meta_add_qc, df_meta %>% select(sample, Ct_value), "sample")
+   df_snvs_meta_add_qc$Ct_value[is.na(df_snvs_meta_add_qc$Ct_value)] <- mean(df_snvs_meta_add_qc$Ct_value, na.rm = TRUE)
 }
 df_snvs_meta_add_qc_adj <- add_residuals(bind_rows(df_snvs_meta_add_qc %>% mutate(gene="Full genome"), df_snvs_meta_add_qc), x_var = "Ct_value", y_var = "sec_freq", out_var = "sec_freq_adj")
 
+write_csv(df_snvs_meta_add_qc_adj %>% filter(gene!="Full genome"), "../results/df_snvs_meta_add_qc_bam_adj.csv")
 save(df_plot_n_gene_meta_adj, file="../results/df_plot_n_gene_adj.rdata")
-
-### Ct value
-load(file="../results/df_plot_n_gene_adj.rdata")
-p_pre <- ggscatter(df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x = "Ct_value", y = "n_per_kb",
-   add = "reg.line",  # Add regressin line
-   add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
-   alpha=0.8,
-   size=0.8,
-   conf.int = TRUE # Add confidence interval
-   )+
-   xlab("Ct value")+
-   ylab("Number of iSNVs per Kb")+
-   stat_cor(method = "pearson", label.x = 10, label.y = 4)+
-   NULL
-p_aft <- ggscatter(df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x = "Ct_value", y = "n_per_kb_adj",
-   add = "reg.line",  # Add regressin line
-   alpha=0.8,
-   size=0.8,
-   add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
-   conf.int = TRUE # Add confidence interval
-   )+
-   xlab("Ct value")+
-   ylab("Number of iSNVs per Kb (adjusted)")+
-   stat_cor(method = "pearson", label.x = 10, label.y = 1.3)+
-   NULL
-p_pre2 <- ggscatter(df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x = "collection_lag", y = "n_per_kb",
-   add = "reg.line",  # Add regressin line
-   add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
-   alpha=0.8,
-   size=0.8,
-   conf.int = TRUE # Add confidence interval
-   )+
-   xlab("Collection lag (days)")+
-   ylab("Number of iSNVs per Kb")+
-   stat_cor(method = "pearson", label.x = 0, label.y = 4)+
-   NULL
-p_aft2 <- ggscatter(df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x = "collection_lag", y = "n_per_kb_adj",
-   add = "reg.line",  # Add regressin line
-   alpha=0.8,
-   size=0.8,
-   add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
-   conf.int = TRUE # Add confidence interval
-   )+
-   xlab("Collection lag (days)")+
-   ylab("Number of iSNVs per Kb (adjusted)")+
-   stat_cor(method = "pearson", label.x = 0, label.y = 1.3)+
-   NULL
-ggsave("../results/collection_lag_vs_isnvs_adj.pdf", plot=p_aft2)
-
-p_out_lag <- ggscatter(df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x = "Ct_value", y = "collection_lag",
-   add = "reg.line",  # Add regressin line
-   size=0.8,
-   alpha=0.8,
-   add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
-   conf.int = TRUE # Add confidence interval
-   )+
-   xlab("Ct value")+
-   ylab("Collection lag (days)")+
-   stat_cor(method = "pearson", label.x = 10, label.y = 20)+
-   NULL
-
-#### MAF
-p_maf <- ggscatter(df_snvs_meta_add_qc_adj %>% filter(gene=="Full genome"), x = "Ct_value", y = "sec_freq",
-   add = "reg.line",  # Add regressin line
-   add.params = list(color = "blue", fill = "lightgray"), # Customize reg. line
-   conf.int = TRUE, # Add confidence interval
-   size = 0.8
-   )+
-   xlab("Ct value")+
-   ylab("MAF")+
-   stat_cor(method = "pearson", label.x = 0, label.y = 0.6)+
-   NULL
-
-# p_out <- ((p_pre+ggtitle("A"))/(p_maf+ggtitle("C"))/(p_aft+ggtitle("E")))|((p_pre2+ggtitle("B"))/(p_out_lag+ggtitle("D")))
-p_out <- ((p_pre+ggtitle("A"))|(p_out_lag+ggtitle("B")))/(p_pre2+ggtitle("C")|(p_maf+ggtitle("D")))/(p_aft+ggtitle("E"))
-ggsave("../results/n_per_kb_adjusted.pdf", width=10, height=10)
 

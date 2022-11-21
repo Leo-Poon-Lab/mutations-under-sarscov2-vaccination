@@ -10,15 +10,18 @@ library(boot)
 library(writexl)
 library(parallel)
 library(RColorBrewer)
+library(ggpubr)
 library(patchwork)
 source("./helper/cal_nu_diveristy_pi.r")
 source("https://raw.githubusercontent.com/Koohoko/Save-ggplot-to-pptx/main/scripts/save_pptx.r")
 
 df_orf_sim <- read_csv("../data/ORF_SCoV2_sim.csv")
-
 df_meta <- read_csv("../results/df_samples.csv", guess_max=100000)
+df_meta <- df_meta %>% filter(lineage_sim != "22B (Omicron, BA.5.*)")
+df_meta %>% filter(is.na(Ct_value))
+
 lineages_all <- sort(unique(df_meta$lineage_sim))
-colors_lineage=c("#e41a1c", "#33a02c", "#1f78b4", "#ff7f00", "#f781bf", "#666666") 
+colors_lineage=rev(c("#4daf4a", "#984ea3", "#ff7f00", "#f781bf", "#666666"))
 names(colors_lineage) <- lineages_all
 vaccine_all <- sort(unique(df_meta$Vaccine))
 colors_vaccine=c("#a65628", "#7570b3", "#999999")
@@ -32,7 +35,8 @@ df_meta$collection_lag[df_meta$collection_lag>100] <- NA # one ourlier
 df_meta$collection_lag[df_meta$collection_lag<0] <- NA # one ourlier
 
 df_meta$Classification_sim <- ifelse(grepl("ocal", df_meta$Classification), "Local", "Imported")
-table(df_meta$Vaccine, df_meta$Classification_sim, df_meta$lineage_sim)
+df_meta$Ct_value[is.na(df_meta$Ct_value)] <- mean(df_meta$Ct_value, na.rm = TRUE)
+# table(df_meta$Vaccine, df_meta$Classification_sim, df_meta$lineage_sim)
 
 df_snvs_meta_add_qc <- read_csv("../results/df_snvs_meta_add_qc_bam.csv", guess_max=600000)
 samples_analysed <- unique(df_snvs_meta_add_qc$sample)
@@ -43,6 +47,8 @@ idx <- sapply(paste0("/", samples_analysed, "/"), function(x) {
 	tmp <- grep(x, files_tmp)[1]
 })
 
+# samples_analysed[is.na(files_tmp[idx])]
+
 stopifnot(!any(is.na(files_tmp[idx])))
 codon_results <- mclapply(files_tmp[idx], read_tsv, mc.cores=16)
 codon_results <- bind_rows(codon_results)
@@ -52,11 +58,16 @@ codon_results$sample <- gsub(".vcf", "", codon_results$file)
 stopifnot(all(unique(codon_results$gene) %in% df_orf_sim$sequence)) # normalize gene name
 stopifnot(all(unique(codon_results$sample) %in% df_meta$sample)) # normalize sample name
 
-df_all_codon <- codon_results %>% select(gene, site, codon) %>% unique()
+df_all_codon <- codon_results %>% select(gene, site, codon, N_sites_ref, S_sites_ref) %>% unique()
+
 df_samples_gene <- full_join(df_meta %>% select(sample, Vaccine, lineage_sim, Doses), df_all_codon, by = character())
 
-codon_results <- left_join(df_samples_gene, codon_results %>% select(-product, -file)) # complete the codon results by adding samples without any iSNVs
-codon_results <- codon_results %>% mutate_at(vars(num_overlap_ORF_nts:S_gdiv), function(x) {x[is.na(x)] <- 0;x})
+codon_results <- left_join(df_samples_gene, codon_results %>% select(-product, -file, N_sites_ref, S_sites_ref)) # complete the codon results by adding samples without any iSNVs
+codon_results$N_sites[is.na(codon_results$N_sites)] <- codon_results$N_sites_ref[is.na(codon_results$N_sites)] # fix N_diffs S_difs
+codon_results$S_sites[is.na(codon_results$S_sites)] <- codon_results$S_sites_ref[is.na(codon_results$S_sites)] # fix N_diffs S_difs
+codon_results$N_diffs[is.na(codon_results$N_diffs)] <- 0
+codon_results$S_diffs[is.na(codon_results$S_diffs)] <- 0
+
 stopifnot(sum(is.na(codon_results$N_diffs))==0)
 
 # Rename product column
@@ -122,9 +133,18 @@ codon_results$product <- codon_results$product_segment
 codon_results$codon_num_ORF <- codon_results$codon_num
 codon_results <- dplyr::select(codon_results, sample, product, product_segment, codon_num, codon_num_ORF, everything())
 
+source("./helper/plot_reg.R")
+codon_results <- left_join(codon_results, df_meta %>% select(Sample, Ct_value) %>% mutate(sample=Sample), "sample") 
+codon_results$N_diffs_ori <- codon_results$N_diffs
+codon_results$S_diffs_ori <- codon_results$S_diffs
+
+codon_results$gene <- "all" # adjust at codon level, rather than gene level
+codon_results$N_diffs <- add_residuals(codon_results, x_var = "Ct_value", y_var = "N_diffs_ori", out_var = "N_diffs_adj") %>% .$N_diffs_adj # adjusted by Ct value
+codon_results$S_diffs <- add_residuals(codon_results, x_var = "Ct_value", y_var = "S_diffs_ori", out_var = "S_diffs_adj") %>% .$S_diffs_adj # adjusted by Ct value
 
 ################################################################################
 ### piN/piS by SAMPLE (whole-genome), NOL regions only
+
 (codon_results_NOL_bySample <- filter(codon_results, num_overlap_ORF_nts == 0) %>%
     group_by(sample) %>%
     summarise(
@@ -134,25 +154,38 @@ codon_results <- dplyr::select(codon_results, sample, product, product_segment, 
       S_sites = sum(S_sites)
     ))
 
+stopifnot(sum(codon_results_NOL_bySample$N_sites==0)==0) # make sure all rows have valid N_sites/S_sites
+
+codon_results_NOL_bySample <- left_join(codon_results_NOL_bySample, df_meta %>% select(Sample, detection_lag, collection_lag, Ct_value, days_since_last_dose) %>% mutate(sample=Sample), "sample") 
+stopifnot(sum(is.na(codon_results_NOL_bySample$Ct_value))==0) # make sure all rows have valid Ct_value
+
 codon_results_NOL_bySample$piN <- (codon_results_NOL_bySample$N_diffs / codon_results_NOL_bySample$N_sites)
-codon_results_NOL_bySample$piN[is.na(codon_results_NOL_bySample$piN)] <- 0
 codon_results_NOL_bySample$piS <- (codon_results_NOL_bySample$S_diffs / codon_results_NOL_bySample$S_sites)
-codon_results_NOL_bySample$piS[is.na(codon_results_NOL_bySample$piS)] <- 0
 codon_results_NOL_bySample$piNpiS <- codon_results_NOL_bySample$piN / codon_results_NOL_bySample$piS
+codon_results_NOL_bySample$piNmpiS <- codon_results_NOL_bySample$piN - codon_results_NOL_bySample$piS
+# plot_reg(codon_results_NOL_bySample,  "Ct_value", "N_diffs", x_lab=NA, y_lab=NA)
+# plot_reg(codon_results_NOL_bySample,  "Ct_value", "S_diffs", x_lab=NA, y_lab=NA)
+# plot_reg(codon_results_NOL_bySample,  "Ct_value", "piNmpiS", x_lab=NA, y_lab=NA)
+# ggsave("../results/tmp.pdf")
 
 # test piN==piS
-(codon_results_NOL_bySample_MEANPIN <- mean(codon_results_NOL_bySample$piN, na.rm = TRUE)) # 3.274891e-05
-(codon_results_NOL_bySample_MEANPIS <- mean(codon_results_NOL_bySample$piS, na.rm = TRUE)) # 5.1089e-05
-(codon_results_NOL_bySample_MEANPINPIS <- codon_results_NOL_bySample_MEANPIN / codon_results_NOL_bySample_MEANPIS) # 0.6410169
-(codon_results_NOL_bySample_WILCOXP <- wilcox.test(codon_results_NOL_bySample$piN, codon_results_NOL_bySample$piS, paired = TRUE)) # p-value < 2.2e-16
+(codon_results_NOL_bySample_MEANPIN <- mean(codon_results_NOL_bySample$piN, na.rm = TRUE)) # 2.452685e-06
+(codon_results_NOL_bySample_MEANPIS <- mean(codon_results_NOL_bySample$piS, na.rm = TRUE)) # 3.965939e-06
+
+# (codon_results_NOL_bySample_MEANPINPIS_ori <- codon_results_NOL_bySample_MEANPIN_ori / codon_results_NOL_bySample_MEANPIS_ori) # 0.6722664
+(codon_results_NOL_bySample_MEANPINmPIS <- mean(codon_results_NOL_bySample$piNmpiS)) # -1.513254e-06
+(codon_results_NOL_bySample_WILCOXP <- wilcox.test(codon_results_NOL_bySample$piN, codon_results_NOL_bySample$piS, paired = TRUE)) # p-value = 1.193e-10
 
 ###############################################################################
 ### IMPORT GROUP INFO
 codon_results_NOL_bySample <- left_join(x = codon_results_NOL_bySample, y = df_meta %>% select(sample,Vaccine,lineage_sim,Doses), by = "sample")
 
 # RESULTS BY OUTBREAK
-(codon_results_NOL_bySample$pi <- codon_results_NOL_bySample$piN + codon_results_NOL_bySample$piS)
+codon_results_NOL_bySample$pi <- codon_results_NOL_bySample$piN + codon_results_NOL_bySample$piS
 summary(codon_results_NOL_bySample$pi)
+# plot_reg(codon_results_NOL_bySample,  "Ct_value", "pi", x_lab=NA, y_lab=NA)
+# ggsave("../results/tmp.pdf")
+
 #      Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
 # 0.000e+00 0.000e+00 5.333e-06 2.286e-05 3.071e-05  3.970e-04 
 write_csv(codon_results_NOL_bySample, "../results/codon_results_NOL_bySample.csv")
@@ -182,7 +215,7 @@ write_csv(codon_results_NOL_bySample, "../results/codon_results_NOL_bySample.csv
     sd_piS = sd(piS, na.rm = TRUE)
   ))
 
-codon_results_NOL_bySample_bygroup$mean_piNpiS <- codon_results_NOL_bySample_bygroup$mean_piN / codon_results_NOL_bySample_bygroup$mean_piS
+# codon_results_NOL_bySample_bygroup$mean_piNpiS <- codon_results_NOL_bySample_bygroup$mean_piN / codon_results_NOL_bySample_bygroup$mean_piS
 write_csv(codon_results_NOL_bySample_bygroup, "../results/codon_results_NOL_bySample_bygroup.csv")
 
 # pi, between groups
@@ -199,6 +232,10 @@ df_wilc_test <- cal_wilc_test(codon_results_NOL_bySample %>% mutate(gene="Full g
 df_wilc_test <- highlight_diff(df_wilc_test)
 write_xlsx(df_wilc_test, "../results/df_test_diversity_piS_by_vaccine_gene_more.xlsx")
 
+df_wilc_test <- cal_wilc_test(codon_results_NOL_bySample %>% mutate(gene="Full genome"), "pi", genes=c("Full genome"))
+df_wilc_test <- highlight_diff(df_wilc_test)
+df_wilc_test %>% filter(check_p_adj) %>% select(var1, var2, median_var1, median_var2, notation_adj) %>% t()
+
 df_wilc_test <- cal_wilc_test(codon_results_NOL_bySample %>% mutate(gene="Full genome"), "piNpiS", genes=c("Full genome"))
 df_wilc_test <- highlight_diff(df_wilc_test)
 write_xlsx(df_wilc_test, "../results/df_test_diversity_piNpiS_by_vaccine_gene_more.xlsx")
@@ -206,6 +243,7 @@ write_xlsx(df_wilc_test, "../results/df_test_diversity_piNpiS_by_vaccine_gene_mo
 codon_results_NOL_bySample$piN_m_piS <- codon_results_NOL_bySample$piN-codon_results_NOL_bySample$piS
 df_wilc_test <- cal_wilc_test(codon_results_NOL_bySample %>% mutate(gene="Full genome"), "piN_m_piS", genes=c("Full genome"))
 df_wilc_test <- highlight_diff(df_wilc_test)
+df_wilc_test %>% filter(check_p_adj) %>% select(var1, var2, median_var1, median_var2, notation_adj) %>% t()
 write_xlsx(df_wilc_test, "../results/df_test_diversity_piN_m_piS_by_vaccine_gene_more.xlsx")
 
 ###############################################################################
@@ -323,7 +361,7 @@ dNdS_diff_boot_fun <- function(codon_results, numerator, denominator, num_replic
   ASL_dN_lt_dS_P <- boot_dN_gt_dS_count / (boot_dN_gt_dS_count + boot_dN_eq_dS_count + boot_dN_lt_dS_count)
   
   return(paste(num_replicates, dN, dS, dNdS, dN_m_dS, boot_dN_SE, boot_dS_SE, boot_dN_over_dS_SE, boot_dN_over_dS_P, 
-               boot_dN_m_dS_SE, boot_dN_m_dS_P, 
+               boot_dN_m_dS_SE, boot_dN_m_dS_P, # P value
                boot_dN_gt_dS_count, boot_dN_eq_dS_count, boot_dN_lt_dS_count, ASL_dN_gt_dS_P, ASL_dN_lt_dS_P,
                sep = "\t"))
 }
@@ -464,7 +502,7 @@ write_tsv(intrahost_results_bootstrap, "../results/intrahost_results_bootstrap_p
 
 
 ###############################################################################
-### SUMMARIZE RESULTS BY CODON MEANS, NOL ONLY, NOW BY OUTBREAK!
+### SUMMARIZE RESULTS BY CODON MEANS, NOL ONLY, NOW BY subgroup!
 
 # JOIN outbreak metadata
 codon_results$outbreak <- paste0(codon_results$Vaccine, " (Doses=", codon_results$Doses, ") ", codon_results$lineage_sim)
@@ -660,6 +698,13 @@ intrahost_bygroup_results_bootstrap <- read_tsv("../results/intrahost_bygroup_re
 
 # COMBINE
 intrahost_results_bootstrap <- rbind(intrahost_results_bootstrap, intrahost_bygroup_results_bootstrap)
+unique(intrahost_results_bootstrap$outbreak)
+intrahost_results_bootstrap$outbreak <- gsub("21M (Delta,", "21J (Delta,", intrahost_results_bootstrap$outbreak, fixed=T)
+intrahost_results_bootstrap$outbreak <- gsub("BioNTech", "Comirnaty", intrahost_results_bootstrap$outbreak, fixed=T)
+intrahost_results_bootstrap$outbreak <- gsub("Sinovac", "CoronaVac", intrahost_results_bootstrap$outbreak, fixed=T)
+intrahost_results_bootstrap$outbreak <- gsub("(Doses=2) ", "(Doses=2)\n", intrahost_results_bootstrap$outbreak, fixed=T)
+intrahost_results_bootstrap$outbreak <- gsub("(Doses=3) ", "(Doses=3)\n", intrahost_results_bootstrap$outbreak, fixed=T)
+intrahost_results_bootstrap$outbreak <- gsub("Unvaccinated ", "Unvaccinated\n", intrahost_results_bootstrap$outbreak, fixed=T)
 
 ### CONVERT TO LONG
 intrahost_results_bootstrap_LONG <- intrahost_results_bootstrap %>%
@@ -756,8 +801,6 @@ intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_valu
 write_xlsx(intrahost_results_bootstrap_LONG, "../results/intrahost_allProductsbygroup_PLOT_SOURCE.xlsx")
 
 ### PLOT
-intrahost_results_bootstrap_LONG$outbreak
-
 gene_list_1 <- c("Full genome", "S") 
 gene_list_2 <- gene_names_allLevels[!gene_names_allLevels %in% gene_list_1]
 
@@ -800,7 +843,7 @@ n_color <- nrow(filter(intrahost_error_bar_colors, gene_name %in% gene_list_1))/
           #legend.background = element_rect(fill = 'white', color = 'black'),
           strip.background = element_blank()) +
     xlab("") + 
-    ylab(bquote('Differences per site ('*'x 10'^'-4'*')')) + 
+    ylab(bquote('Differences per site (adjusted) ('*'x 10'^'-4'*')')) + 
     scale_x_discrete(guide = guide_axis(n.dodge = 2))+
     scale_y_continuous(breaks = scales::pretty_breaks(3), expand = expand_scale(mult = c(0, 0.1))) + # 0.1
     scale_fill_gradient2(low = brewer.pal(9, "Blues")[5], mid = 'white', high = brewer.pal(9, "Reds")[5], midpoint = 0, na.value = "white", limits=c(-1,1))) 
@@ -871,7 +914,7 @@ save_pptx(file = "../results/intrahost_allProductsbygroup_PLOT.pptx", width = 6,
 intrahost_results_bootstrap_LONG_WIDE <- pivot_wider(data = dplyr::select(intrahost_results_bootstrap_LONG, -significance, -dNdS_norm, -significance_P), 
                                                                 names_from = d_measure, values_from = c(d_value, d_SE_min, d_SE_max))
 write_xlsx(intrahost_results_bootstrap_LONG_WIDE, "../results/intrahost_results_bootstrap_LONG_WIDE.xlsx")
-View(intrahost_results_bootstrap_LONG_WIDE)
+# View(intrahost_results_bootstrap_LONG_WIDE)
 
 # Both ratios above/below 1?
 (ratio_direction_by_outbreak <- filter(intrahost_results_bootstrap, outbreak != "Combined") %>%
@@ -911,7 +954,8 @@ write_tsv(codon_results_byProductCodon, "../results/codon_results_byProductCodon
 
 dir.create("../results/intrahost_sliding_windows/")
 system("chmod 755 ./SNPGenie_sliding_windows.R")
-mclapply(seq(10, 50, 10), function(size) {
+# mclapply(seq(10, 50, 10), function(size) {
+mclapply(30, function(size) {
 	print("############")
 	print(size)
 	print("############")
@@ -929,7 +973,8 @@ mclapply(seq(10, 50, 10), function(size) {
 ###############################################################################
 ###############################################################################
 ### PLOT sliding windows
-mclapply(seq(10, 50, 10), function(WINDOW_SIZE) {
+# mclapply(seq(10, 50, 10), function(WINDOW_SIZE) {
+mclapply(30, function(WINDOW_SIZE) {
 	# WINDOW_SIZE <- 30
 	# Combine files :
 	# IN: ../results/intrahost_sliding_windows_size30
@@ -1094,153 +1139,255 @@ mclapply(seq(10, 50, 10), function(WINDOW_SIZE) {
 
 ### CANDIDATE WINDOWS for 30 codons
 
-# # PIVOT to SHORT again
-# #View(codon_results_byProductCodon_WINDOWS_POOLED_LONG)
-# codon_results_byProductCodon_WINDOWS_POOLED_WIDE <- pivot_wider(data = codon_results_byProductCodon_WINDOWS_POOLED_LONG, 
-#                                                                  names_from = d_measure, values_from = c(d_value, d_value_SE, d_value_CI_min, d_value_CI_max))
-# #View(codon_results_byProductCodon_WINDOWS_POOLED_WIDE)
+# PIVOT to SHORT again
+#View(codon_results_byProductCodon_WINDOWS_POOLED_LONG)
+WINDOW_SIZE <- 30
+files_product_window_rst <- list.files("../results/intrahost_sliding_windows/", pattern=paste0("size_", WINDOW_SIZE, "_WINDOWS"), full.names=T)
+codon_results_byProductCodon_WINDOWS_POOLED <- lapply(files_product_window_rst, read_tsv)
+codon_results_byProductCodon_WINDOWS_POOLED <- do.call(rbind, codon_results_byProductCodon_WINDOWS_POOLED)
+codon_results_byProductCodon_WINDOWS_POOLED$sw_center_ORF <- codon_results_byProductCodon_WINDOWS_POOLED$sw_center
 
-# # JOIN the PRODUCT'S values
-# product_dS_values <- dplyr::select(codon_results_byProductCodon_byProduct, product, dS)
-# names(product_dS_values) <- c("product", "product_dS")
-# codon_results_byProductCodon_WINDOWS_POOLED_WIDE <- left_join(x = codon_results_byProductCodon_WINDOWS_POOLED_WIDE, product_dS_values, by = "product")
+for (this_product in unique(codon_results_byProductCodon_WINDOWS_POOLED$product)) {
+#this_product <- "E"
 
-# # Get the candidates
-# CANDIDATE_WINDOWS_SIZE30 <- filter(codon_results_byProductCodon_WINDOWS_POOLED_WIDE, 
-#                                    d_value_CI_min_sw_dN > d_value_CI_max_sw_dS, 
-#                                    d_value_CI_min_sw_dN > product_dS)
-# #View(CANDIDATE_WINDOWS_SIZE30)
+# codon
+codon_results_byProductCodon_WINDOWS_POOLED[codon_results_byProductCodon_WINDOWS_POOLED$product == this_product, ]$codon_num <- 
+  codon_results_byProductCodon_WINDOWS_POOLED[codon_results_byProductCodon_WINDOWS_POOLED$product == this_product, ]$codon_num - 
+  min(codon_results_byProductCodon_WINDOWS_POOLED[codon_results_byProductCodon_WINDOWS_POOLED$product == this_product, ]$codon_num) + 1
+}
 
-# # SAVE CANDIDATES
-# write_tsv(CANDIDATE_WINDOWS_SIZE30, "../results/CANDIDATE_WINDOWS_SIZE30.tsv")
+# Renumber sw_center
+codon_results_byProductCodon_WINDOWS_POOLED$sw_center <- codon_results_byProductCodon_WINDOWS_POOLED$codon_num + ((WINDOW_SIZE - 1) / 2)
+codon_results_byProductCodon_WINDOWS_POOLED[is.na(codon_results_byProductCodon_WINDOWS_POOLED$sw_start), ]$sw_center <- NA
+#View(codon_results_byProductCodon_WINDOWS_POOLED)
+
+# # Rename nsp12
+# codon_results_byProductCodon_WINDOWS_POOLED[codon_results_byProductCodon_WINDOWS_POOLED$product %in% c("nsp12_1", "nsp12_2"), ]$product <- "nsp12"
+
+# Make a long form for plotting dN and dS
+(codon_results_byProductCodon_WINDOWS_POOLED_LONG <- codon_results_byProductCodon_WINDOWS_POOLED %>%
+  pivot_longer(cols = c('sw_dN', 'sw_dS'), names_to = "d_measure", values_to = "d_value"))
+
+### DEFINE products
+(uniq_products_LONG <- unique(codon_results_byProductCodon_WINDOWS_POOLED_LONG$product)) # nsp not included because only 8 codons!
+# "E", "M", "N", "ORF10", "ORF3a", "ORF3c", "ORF3d", "ORF6", "ORF7a", "ORF7b", "ORF8", "ORF9b", "ORF9c", "S", "SiORF1", "SiORF2", "nsp10", "nsp12", "nsp13", "nsp14", "nsp15", "nsp16", "nsp1", "nsp2", "nsp3", "nsp4", "nsp5", "nsp6", "nsp7", "nsp8", "nsp9", 
+uniq_products_LONG_SORTED <- gene_names_sorted
+uniq_products_LONG_SORTED_KEEPERS <- gene_names_sorted
+
+# FACTOR products
+codon_results_byProductCodon_WINDOWS_POOLED_LONG$product <- factor(codon_results_byProductCodon_WINDOWS_POOLED_LONG$product, 
+                                levels = uniq_products_LONG_SORTED)
+
+###############################################################################
+### SUMMARIZE piN and piS for each product (NOT LONG)
+(codon_results_byProductCodon_byProduct <- filter(codon_results_byProductCodon_WINDOWS_POOLED) %>%
+group_by(product) %>%
+summarise(
+  N_sites = sum(N_sites, na.rm = TRUE),
+  S_sites = sum(S_sites, na.rm = TRUE),
+  N_diffs = sum(N_diffs, na.rm = TRUE),
+  S_diffs = sum(S_diffs, na.rm = TRUE)
+))
+
+# MANUALLY ENSURE THIS IS THE CASE BEFOREHAND
+codon_results_byProductCodon_byProduct$num_defined_seqs <- 6
+
+# ADD STATS
+codon_results_byProductCodon_byProduct$dN <- codon_results_byProductCodon_byProduct$N_diffs / codon_results_byProductCodon_byProduct$N_sites
+codon_results_byProductCodon_byProduct$dS <- codon_results_byProductCodon_byProduct$S_diffs / codon_results_byProductCodon_byProduct$S_sites
+codon_results_byProductCodon_byProduct$dNdS <- codon_results_byProductCodon_byProduct$dN / codon_results_byProductCodon_byProduct$dS
+#View(codon_results_byProductCodon_byProduct)
+
+# FACTOR MEANS
+codon_results_byProductCodon_byProduct$product <- factor(codon_results_byProductCodon_byProduct$product, 
+                            levels = uniq_products_LONG_SORTED)
+
+# Create STANDARD ERROR COLUMN
+#View(codon_results_byProductCodon_WINDOWS_POOLED_LONG)
+codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_SE <- codon_results_byProductCodon_WINDOWS_POOLED_LONG$sw_boot_dN_SE
+codon_results_byProductCodon_WINDOWS_POOLED_LONG[codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_measure == "sw_dS", ]$d_value_SE <- 
+codon_results_byProductCodon_WINDOWS_POOLED_LONG[codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_measure == "sw_dS", ]$sw_boot_dS_SE
+codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_CI_min <- 
+codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value - codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_SE
+codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_CI_max <- 
+codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value + codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_SE
+
+# reset negative mins to 0
+codon_results_byProductCodon_WINDOWS_POOLED_LONG[!is.na(codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_CI_min) & 
+                        codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_CI_min < 0, ]$d_value_CI_min <- 0
+
+codon_results_byProductCodon_WINDOWS_POOLED_WIDE <- pivot_wider(data = codon_results_byProductCodon_WINDOWS_POOLED_LONG, 
+                                                                 names_from = d_measure, values_from = c(d_value, d_value_SE, d_value_CI_min, d_value_CI_max))
+#View(codon_results_byProductCodon_WINDOWS_POOLED_WIDE)
+
+# JOIN the PRODUCT'S values
+product_dS_values <- dplyr::select(codon_results_byProductCodon_byProduct, product, dS)
+names(product_dS_values) <- c("product", "product_dS")
+codon_results_byProductCodon_WINDOWS_POOLED_WIDE <- left_join(x = codon_results_byProductCodon_WINDOWS_POOLED_WIDE, product_dS_values, by = "product")
+
+# Get the candidates
+CANDIDATE_WINDOWS_SIZE30 <- filter(codon_results_byProductCodon_WINDOWS_POOLED_WIDE, 
+                                   d_value_CI_min_sw_dN > d_value_CI_max_sw_dS, 
+                                   d_value_CI_min_sw_dN > product_dS)
+#View(CANDIDATE_WINDOWS_SIZE30)
+
+# SAVE CANDIDATES
+write_tsv(CANDIDATE_WINDOWS_SIZE30, "../results/CANDIDATE_WINDOWS_SIZE30.tsv")
 
 
-# ################################################################################
-# # MANUALLY DEFINED START TO END OF CANDIDATE WINDOWS IN CANDIDATE_WINDOWS_SIZE30.xlsx, saved in CANDIDATE_WINDOWS_SIZE30_table.tsv
-# # LOOP and define/test each window; list codons with nonsyn diffs; etc.
+################################################################################
+# MANUALLY DEFINED START TO END OF CANDIDATE WINDOWS IN CANDIDATE_WINDOWS_SIZE30.xlsx, saved in CANDIDATE_WINDOWS_SIZE30_table.tsv
+# LOOP and define/test each window; list codons with nonsyn diffs; etc.
 # CANDIDATE_WINDOWS_SIZE30_table <- read_tsv("../results/CANDIDATE_WINDOWS_SIZE30_table.tsv")
-# CANDIDATE_WINDOWS_SIZE30_table$N_diffs <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$S_diffs <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$N_sites <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$S_sites <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$N_diff_codons <- ""
-# CANDIDATE_WINDOWS_SIZE30_table$piN_max_codon <- NaN
 
-# # Additional columns
-# CANDIDATE_WINDOWS_SIZE30_table$num_bootstraps <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$num_codons <- NaN
-# #CANDIDATE_WINDOWS_SIZE30_table$N_sites_check <- NA
-# #CANDIDATE_WINDOWS_SIZE30_table$S_sites_check <- NA
-# #CANDIDATE_WINDOWS_SIZE30_table$N_diffs_check <- NA
-# #CANDIDATE_WINDOWS_SIZE30_table$S_diffs_check <- NA
-# CANDIDATE_WINDOWS_SIZE30_table$num_replicates <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$dN_check <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$dS_check <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$dNdS_check <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$dN_m_dS_check <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$boot_dN_SE <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$boot_dS_SE <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$boot_dN_over_dS_SE <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$boot_dN_over_dS_P <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$boot_dN_m_dS_SE <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$P_value <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$boot_dN_gt_dS_count <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$boot_dN_eq_dS_count <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$boot_dN_lt_dS_count <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$ASL_dN_gt_dS_P <- NaN
-# CANDIDATE_WINDOWS_SIZE30_table$ASL_dN_lt_dS_P <- NaN
+identify_consecutive_Region <- function(num_list, position="start") {
+  # num_list <- c(1, 3, 5:8, 10:13, 16, 19, 33:41)
+  stopifnot(position%in%c("start", "stop"))
 
-# # Bootstrap parameters
-# NBOOTSTRAPS <- 10000
-# NCPUS <- 8
-# # no min number codons because NA here
+  diff_num_list <- diff(num_list)
+  rle_rst <- rle(diff_num_list)
+  
+  pos <- lapply(which(rle_rst$values==1), function(i) {
+    if(i==1){
+      return(c(1, 1+rle_rst$lengths[1]))
+    } else {
+      return(c(sum(rle_rst$lengths[1:(i-1)])+1, sum(rle_rst$lengths[1:(i-1)])+1+rle_rst$lengths[i]))
+    }
+  })
 
-# #View(CANDIDATE_WINDOWS_SIZE30_table)
+  out <- sapply(pos, function(x){
+    pos_starts <- num_list[x[1]]
+    pos_stops <- num_list[x[2]]
+    return(c(pos_starts, pos_stops))
+  })
 
-# # LOOP
-# for (i in 1:nrow(CANDIDATE_WINDOWS_SIZE30_table)) {
-#   #i <- 15 # 21 # 15
-#   cat(i, " ")
-#   this_row <- CANDIDATE_WINDOWS_SIZE30_table[i, ]
-#   this_product <- as.character(this_row$product)
-#   this_start <- as.integer(this_row$codon_start)
-#   this_end <- as.integer(this_row$codon_end)
-  
-#   this_data_subset <- filter(codon_results_byProductCodon_WINDOWS_POOLED_WIDE, # codon_results_byProductCodon, 
-#                              product == this_product, # product_segment == this_product, # 
-#                              codon_num >= this_start,
-#                              codon_num <= this_end)
-  
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$num_codons <- nrow(this_data_subset)
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$N_diffs <- sum(this_data_subset$N_diffs, na.rm = TRUE)
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$S_diffs <- sum(this_data_subset$S_diffs, na.rm = TRUE)
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$N_sites <- sum(this_data_subset$N_sites, na.rm = TRUE)
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$S_sites <- sum(this_data_subset$S_sites, na.rm = TRUE)
-  
-#   # Find codons with N diffs
-#   #View(this_data_subset)
-#   this_data_subset_NDiffCodons <- filter(this_data_subset, N_diffs > 0)$codon_num
-#   this_data_subset_NDiffCodons_string <- paste(this_data_subset_NDiffCodons, collapse = ", ")
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$N_diff_codons <- this_data_subset_NDiffCodons_string
-  
-#   # Find codon with MAX piN
-#   this_data_subset$piN <- this_data_subset$N_diffs / this_data_subset$N_sites
-#   #this_data_subset[is.nan(this_data_subset$piN), ]$piN <- NA
-#   this_data_subset_maxPiNCodon <- as.integer(this_data_subset[! is.na(this_data_subset$piN) & this_data_subset$piN == max(this_data_subset$piN, na.rm = TRUE), ]$codon_num)
-#   #View(this_data_subset)
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$piN_max_codon <- this_data_subset_maxPiNCodon
-  
-#   #View(this_data_subset)
-  
-#   # BOOTSTRAP THIS FULL WINDOW
-#   boot_dNdS <- dNdS_diff_boot_fun(this_data_subset, 'N', 'S', NBOOTSTRAPS, NCPUS)
-  
-#   # RECORD HEADER
-#   boot_vector_names <- c(#'num_codons', 'N_sites', 'S_sites', 'N_diffs', 'S_diffs',
-#                          'num_replicates', 
-#                          'dN', 'dS', 'dNdS', 'dN_m_dS', 'boot_dN_SE', 'boot_dS_SE', 'boot_dN_over_dS_SE', 'boot_dN_over_dS_P', 'boot_dN_m_dS_SE', 'P_value',
-#                          'boot_dN_gt_dS_count', 'boot_dN_eq_dS_count', 'boot_dN_lt_dS_count', 'ASL_dN_gt_dS_P', 'ASL_dN_lt_dS_P')
-  
-#   #boot_dNdS_vector <- unlist(str_split(string = paste(summary_data, boot_dNdS, sep = "\t"), pattern = "\t"))
-#   boot_dNdS_vector <- unlist(str_split(string = paste(boot_dNdS, sep = "\t"), pattern = "\t"))
-  
-#   # Add names
-#   names(boot_dNdS_vector) <- boot_vector_names
-  
-#   # Populate additional rows
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$num_bootstraps = NBOOTSTRAPS
-#   #CANDIDATE_WINDOWS_SIZE30_table[i, ]$num_codons = as.integer(boot_dNdS_vector['num_codons'])
-#   #CANDIDATE_WINDOWS_SIZE30_table[i, ]$N_sites_check = as.numeric(boot_dNdS_vector['N_sites'])
-#   #CANDIDATE_WINDOWS_SIZE30_table[i, ]$S_sites_check = as.numeric(boot_dNdS_vector['S_sites'])
-#   #CANDIDATE_WINDOWS_SIZE30_table[i, ]$N_diffs_check = as.numeric(boot_dNdS_vector['N_diffs'])
-#   #CANDIDATE_WINDOWS_SIZE30_table[i, ]$S_diffs_check = as.numeric(boot_dNdS_vector['S_diffs'])
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$num_replicates = as.integer(boot_dNdS_vector['num_replicates'])
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$dN_check = as.numeric(boot_dNdS_vector['dN'])
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$dS_check = as.numeric(boot_dNdS_vector['dS'])
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$dNdS_check = as.numeric(boot_dNdS_vector['dNdS'])
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$dN_m_dS_check = as.numeric(boot_dNdS_vector['dN_m_dS'])
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$boot_dN_SE = as.numeric(boot_dNdS_vector['boot_dN_SE'])
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$boot_dS_SE = as.numeric(boot_dNdS_vector['boot_dS_SE'])
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$boot_dN_over_dS_SE = as.numeric(boot_dNdS_vector['boot_dN_over_dS_SE'])
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$boot_dN_over_dS_P = as.numeric(boot_dNdS_vector['boot_dN_over_dS_P'])
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$boot_dN_m_dS_SE = as.numeric(boot_dNdS_vector['boot_dN_m_dS_SE'])
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$P_value = as.numeric(boot_dNdS_vector['P_value'])
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$boot_dN_gt_dS_count = as.numeric(boot_dNdS_vector['boot_dN_gt_dS_count'])
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$boot_dN_eq_dS_count = as.numeric(boot_dNdS_vector['boot_dN_eq_dS_count'])
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$boot_dN_lt_dS_count = as.numeric(boot_dNdS_vector['boot_dN_lt_dS_count'])
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$ASL_dN_gt_dS_P = as.numeric(boot_dNdS_vector['ASL_dN_gt_dS_P'])
-#   CANDIDATE_WINDOWS_SIZE30_table[i, ]$ASL_dN_lt_dS_P = as.numeric(boot_dNdS_vector['ASL_dN_lt_dS_P'])
-  
-# }
+  if(position=="start"){return(out[1,])} else if (position=="stop"){return(out[2,])}
+}
 
-# # Calculate basic estimates
-# CANDIDATE_WINDOWS_SIZE30_table$dN <- CANDIDATE_WINDOWS_SIZE30_table$N_diffs / CANDIDATE_WINDOWS_SIZE30_table$N_sites
-# CANDIDATE_WINDOWS_SIZE30_table$dS <- CANDIDATE_WINDOWS_SIZE30_table$S_diffs / CANDIDATE_WINDOWS_SIZE30_table$S_sites
-# CANDIDATE_WINDOWS_SIZE30_table$dNdS <- CANDIDATE_WINDOWS_SIZE30_table$dN / CANDIDATE_WINDOWS_SIZE30_table$dS
+CANDIDATE_WINDOWS_SIZE30_table <- CANDIDATE_WINDOWS_SIZE30 %>% mutate(product=product_segment) %>% group_by(product) %>% summarise(codon_start=identify_consecutive_Region(codon_num, "start"), codon_end=identify_consecutive_Region(codon_num, "stop")) %>% ungroup()
 
-# # SAVE
-# #write_tsv(CANDIDATE_WINDOWS_SIZE30_table, "../results/CANDIDATE_WINDOWS_SIZE30_table_FULL.tsv")
-# write_xlsx(CANDIDATE_WINDOWS_SIZE30_table, "../results/CANDIDATE_WINDOWS_SIZE30_table_FULL2.xlsx")
+CANDIDATE_WINDOWS_SIZE30_table$N_diffs <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$S_diffs <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$N_sites <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$S_sites <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$N_diff_codons <- ""
+CANDIDATE_WINDOWS_SIZE30_table$piN_max_codon <- NaN
+
+# Additional columns
+CANDIDATE_WINDOWS_SIZE30_table$num_bootstraps <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$num_codons <- NaN
+#CANDIDATE_WINDOWS_SIZE30_table$N_sites_check <- NA
+#CANDIDATE_WINDOWS_SIZE30_table$S_sites_check <- NA
+#CANDIDATE_WINDOWS_SIZE30_table$N_diffs_check <- NA
+#CANDIDATE_WINDOWS_SIZE30_table$S_diffs_check <- NA
+CANDIDATE_WINDOWS_SIZE30_table$num_replicates <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$dN_check <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$dS_check <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$dNdS_check <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$dN_m_dS_check <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$boot_dN_SE <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$boot_dS_SE <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$boot_dN_over_dS_SE <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$boot_dN_over_dS_P <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$boot_dN_m_dS_SE <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$P_value <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$boot_dN_gt_dS_count <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$boot_dN_eq_dS_count <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$boot_dN_lt_dS_count <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$ASL_dN_gt_dS_P <- NaN
+CANDIDATE_WINDOWS_SIZE30_table$ASL_dN_lt_dS_P <- NaN
+
+# Bootstrap parameters
+NBOOTSTRAPS <- 10000
+NCPUS <- 8
+# no min number codons because NA here
+
+#View(CANDIDATE_WINDOWS_SIZE30_table)
+
+# LOOP
+for (i in 1:nrow(CANDIDATE_WINDOWS_SIZE30_table)) {
+  #i <- 15 # 21 # 15
+  cat(i, " ")
+  this_row <- CANDIDATE_WINDOWS_SIZE30_table[i, ]
+  this_product <- as.character(this_row$product)
+  this_start <- as.integer(this_row$codon_start)
+  this_end <- as.integer(this_row$codon_end)
+  
+  this_data_subset <- filter(codon_results_byProductCodon_WINDOWS_POOLED_WIDE, # codon_results_byProductCodon, 
+                             product == this_product, # product_segment == this_product, # 
+                             codon_num >= this_start,
+                             codon_num <= this_end)
+  
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$num_codons <- nrow(this_data_subset)
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$N_diffs <- sum(this_data_subset$N_diffs, na.rm = TRUE)
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$S_diffs <- sum(this_data_subset$S_diffs, na.rm = TRUE)
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$N_sites <- sum(this_data_subset$N_sites, na.rm = TRUE)
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$S_sites <- sum(this_data_subset$S_sites, na.rm = TRUE)
+  
+  # Find codons with N diffs
+  #View(this_data_subset)
+  this_data_subset_NDiffCodons <- filter(this_data_subset, N_diffs > 0)$codon_num
+  this_data_subset_NDiffCodons_string <- paste(this_data_subset_NDiffCodons, collapse = ", ")
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$N_diff_codons <- this_data_subset_NDiffCodons_string
+  
+  # Find codon with MAX piN
+  this_data_subset$piN <- this_data_subset$N_diffs / this_data_subset$N_sites
+  #this_data_subset[is.nan(this_data_subset$piN), ]$piN <- NA
+  this_data_subset_maxPiNCodon <- as.integer(this_data_subset[! is.na(this_data_subset$piN) & this_data_subset$piN == max(this_data_subset$piN, na.rm = TRUE), ]$codon_num)
+  #View(this_data_subset)
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$piN_max_codon <- this_data_subset_maxPiNCodon
+  
+  #View(this_data_subset)
+  
+  # BOOTSTRAP THIS FULL WINDOW
+  boot_dNdS <- dNdS_diff_boot_fun(this_data_subset, 'N', 'S', NBOOTSTRAPS, NCPUS)
+  
+  # RECORD HEADER
+  boot_vector_names <- c(#'num_codons', 'N_sites', 'S_sites', 'N_diffs', 'S_diffs',
+                         'num_replicates', 
+                         'dN', 'dS', 'dNdS', 'dN_m_dS', 'boot_dN_SE', 'boot_dS_SE', 'boot_dN_over_dS_SE', 'boot_dN_over_dS_P', 'boot_dN_m_dS_SE', 'P_value',
+                         'boot_dN_gt_dS_count', 'boot_dN_eq_dS_count', 'boot_dN_lt_dS_count', 'ASL_dN_gt_dS_P', 'ASL_dN_lt_dS_P')
+  
+  #boot_dNdS_vector <- unlist(str_split(string = paste(summary_data, boot_dNdS, sep = "\t"), pattern = "\t"))
+  boot_dNdS_vector <- unlist(str_split(string = paste(boot_dNdS, sep = "\t"), pattern = "\t"))
+  
+  # Add names
+  names(boot_dNdS_vector) <- boot_vector_names
+  
+  # Populate additional rows
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$num_bootstraps = NBOOTSTRAPS
+  #CANDIDATE_WINDOWS_SIZE30_table[i, ]$num_codons = as.integer(boot_dNdS_vector['num_codons'])
+  #CANDIDATE_WINDOWS_SIZE30_table[i, ]$N_sites_check = as.numeric(boot_dNdS_vector['N_sites'])
+  #CANDIDATE_WINDOWS_SIZE30_table[i, ]$S_sites_check = as.numeric(boot_dNdS_vector['S_sites'])
+  #CANDIDATE_WINDOWS_SIZE30_table[i, ]$N_diffs_check = as.numeric(boot_dNdS_vector['N_diffs'])
+  #CANDIDATE_WINDOWS_SIZE30_table[i, ]$S_diffs_check = as.numeric(boot_dNdS_vector['S_diffs'])
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$num_replicates = as.integer(boot_dNdS_vector['num_replicates'])
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$dN_check = as.numeric(boot_dNdS_vector['dN'])
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$dS_check = as.numeric(boot_dNdS_vector['dS'])
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$dNdS_check = as.numeric(boot_dNdS_vector['dNdS'])
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$dN_m_dS_check = as.numeric(boot_dNdS_vector['dN_m_dS'])
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$boot_dN_SE = as.numeric(boot_dNdS_vector['boot_dN_SE'])
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$boot_dS_SE = as.numeric(boot_dNdS_vector['boot_dS_SE'])
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$boot_dN_over_dS_SE = as.numeric(boot_dNdS_vector['boot_dN_over_dS_SE'])
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$boot_dN_over_dS_P = as.numeric(boot_dNdS_vector['boot_dN_over_dS_P'])
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$boot_dN_m_dS_SE = as.numeric(boot_dNdS_vector['boot_dN_m_dS_SE'])
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$P_value = as.numeric(boot_dNdS_vector['P_value'])
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$boot_dN_gt_dS_count = as.numeric(boot_dNdS_vector['boot_dN_gt_dS_count'])
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$boot_dN_eq_dS_count = as.numeric(boot_dNdS_vector['boot_dN_eq_dS_count'])
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$boot_dN_lt_dS_count = as.numeric(boot_dNdS_vector['boot_dN_lt_dS_count'])
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$ASL_dN_gt_dS_P = as.numeric(boot_dNdS_vector['ASL_dN_gt_dS_P'])
+  CANDIDATE_WINDOWS_SIZE30_table[i, ]$ASL_dN_lt_dS_P = as.numeric(boot_dNdS_vector['ASL_dN_lt_dS_P'])
+  
+}
+
+# Calculate basic estimates
+CANDIDATE_WINDOWS_SIZE30_table$dN <- CANDIDATE_WINDOWS_SIZE30_table$N_diffs / CANDIDATE_WINDOWS_SIZE30_table$N_sites
+CANDIDATE_WINDOWS_SIZE30_table$dS <- CANDIDATE_WINDOWS_SIZE30_table$S_diffs / CANDIDATE_WINDOWS_SIZE30_table$S_sites
+CANDIDATE_WINDOWS_SIZE30_table$dNdS <- CANDIDATE_WINDOWS_SIZE30_table$dN / CANDIDATE_WINDOWS_SIZE30_table$dS
+
+# SAVE
+#write_tsv(CANDIDATE_WINDOWS_SIZE30_table, "../results/CANDIDATE_WINDOWS_SIZE30_table_FULL.tsv")
+write_xlsx(CANDIDATE_WINDOWS_SIZE30_table, "../results/CANDIDATE_WINDOWS_SIZE30_table_FULL2.xlsx")
 
 
 

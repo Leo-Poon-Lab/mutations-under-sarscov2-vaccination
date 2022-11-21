@@ -4,7 +4,7 @@ library(trackViewer)
 # read data
 df_spike_region <- read_tsv("../data/spike_region.tsv")
 
-df_snvs_meta_add_qc <- read_csv("../results/df_snvs_meta_add_qc_bam.csv", guess_max=600000)
+df_snvs_meta_add_qc <- read_csv("../results/df_snvs_meta_add_qc_bam_adj.csv", guess_max=600000)
 df_snvs_meta_add_qc$Vaccine[df_snvs_meta_add_qc$Vaccine=="Non-vaccinated"] <- "Unvaccinated"
 df_snvs_meta_add_qc$Group <- paste(df_snvs_meta_add_qc$Vaccine, df_snvs_meta_add_qc$lineage_sim)
 
