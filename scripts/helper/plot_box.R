@@ -4,7 +4,6 @@ plot_box <- function(df_plot, x_var, y_var, color_var, x_lab="Group", y_lab) {
 	geom_boxplot(outlier.size=0, outlier.alpha=0, alpha=0.8)+
 	ylab(y_lab)+
 	xlab(x_lab)+
-	# scale_color_manual(name="Lineage", values=colors_lineage)+
 	theme_classic()+
 	NULL
 

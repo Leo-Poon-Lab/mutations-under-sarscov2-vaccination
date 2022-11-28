@@ -150,6 +150,8 @@ codon_results$S_diffs <- add_residuals(codon_results, x_var = "Ct_value", y_var 
     summarise(
       N_diffs = sum(N_diffs),
       S_diffs = sum(S_diffs),
+      N_diffs_ori = sum(N_diffs_ori),
+      S_diffs_ori = sum(S_diffs_ori),
       N_sites = sum(N_sites),
       S_sites = sum(S_sites)
     ))
@@ -182,6 +184,7 @@ codon_results_NOL_bySample <- left_join(x = codon_results_NOL_bySample, y = df_m
 
 # RESULTS BY OUTBREAK
 codon_results_NOL_bySample$pi <- codon_results_NOL_bySample$piN + codon_results_NOL_bySample$piS
+codon_results_NOL_bySample$pi_ori <- (codon_results_NOL_bySample$N_diffs_ori / codon_results_NOL_bySample$N_sites) + (codon_results_NOL_bySample$S_diffs_ori / codon_results_NOL_bySample$S_sites)
 summary(codon_results_NOL_bySample$pi)
 # plot_reg(codon_results_NOL_bySample,  "Ct_value", "pi", x_lab=NA, y_lab=NA)
 # ggsave("../results/tmp.pdf")
@@ -952,6 +955,7 @@ codon_results_byProductCodon$product <- codon_results_byProductCodon$product_seg
 
 write_tsv(codon_results_byProductCodon, "../results/codon_results_byProductCodon.tsv")
 
+system("rm -rf ../results/intrahost_sliding_windows/")
 dir.create("../results/intrahost_sliding_windows/")
 system("chmod 755 ./SNPGenie_sliding_windows.R")
 # mclapply(seq(10, 50, 10), function(size) {
@@ -1079,9 +1083,9 @@ mclapply(30, function(WINDOW_SIZE) {
 	codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_CI_max <- 
 	codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value + codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_SE
 
-	# reset negative mins to 0
-	codon_results_byProductCodon_WINDOWS_POOLED_LONG[!is.na(codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_CI_min) & 
-													codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_CI_min < 0, ]$d_value_CI_min <- 0
+	# reset negative mins to 0 # no need if using adjusted values
+	# codon_results_byProductCodon_WINDOWS_POOLED_LONG[!is.na(codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_CI_min) & 
+													# codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_CI_min < 0, ]$d_value_CI_min <- 0
 
 	# Overlapping genes OLGs to mask
 	OLGs_to_mask <- data.frame(
@@ -1212,9 +1216,9 @@ codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value - codon_results_byProdu
 codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_CI_max <- 
 codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value + codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_SE
 
-# reset negative mins to 0
-codon_results_byProductCodon_WINDOWS_POOLED_LONG[!is.na(codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_CI_min) & 
-                        codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_CI_min < 0, ]$d_value_CI_min <- 0
+# # reset negative mins to 0 # no need if using adjusted values
+# codon_results_byProductCodon_WINDOWS_POOLED_LONG[!is.na(codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_CI_min) & 
+#                         codon_results_byProductCodon_WINDOWS_POOLED_LONG$d_value_CI_min < 0, ]$d_value_CI_min <- 0
 
 codon_results_byProductCodon_WINDOWS_POOLED_WIDE <- pivot_wider(data = codon_results_byProductCodon_WINDOWS_POOLED_LONG, 
                                                                  names_from = d_measure, values_from = c(d_value, d_value_SE, d_value_CI_min, d_value_CI_max))
@@ -1242,6 +1246,7 @@ write_tsv(CANDIDATE_WINDOWS_SIZE30, "../results/CANDIDATE_WINDOWS_SIZE30.tsv")
 
 identify_consecutive_Region <- function(num_list, position="start") {
   # num_list <- c(1, 3, 5:8, 10:13, 16, 19, 33:41)
+  if(length(num_list)==1){return(num_list)}
   stopifnot(position%in%c("start", "stop"))
 
   diff_num_list <- diff(num_list)
@@ -1307,7 +1312,7 @@ NCPUS <- 8
 # LOOP
 for (i in 1:nrow(CANDIDATE_WINDOWS_SIZE30_table)) {
   #i <- 15 # 21 # 15
-  cat(i, " ")
+  cat(i, "of", nrow(CANDIDATE_WINDOWS_SIZE30_table), "; ")
   this_row <- CANDIDATE_WINDOWS_SIZE30_table[i, ]
   this_product <- as.character(this_row$product)
   this_start <- as.integer(this_row$codon_start)
@@ -1326,7 +1331,8 @@ for (i in 1:nrow(CANDIDATE_WINDOWS_SIZE30_table)) {
   
   # Find codons with N diffs
   #View(this_data_subset)
-  this_data_subset_NDiffCodons <- filter(this_data_subset, N_diffs > 0)$codon_num
+  # this_data_subset_NDiffCodons <- filter(this_data_subset, N_diffs > 0)$codon_num
+  this_data_subset_NDiffCodons <- this_data_subset$codon_num
   this_data_subset_NDiffCodons_string <- paste(this_data_subset_NDiffCodons, collapse = ", ")
   CANDIDATE_WINDOWS_SIZE30_table[i, ]$N_diff_codons <- this_data_subset_NDiffCodons_string
   
@@ -1335,6 +1341,7 @@ for (i in 1:nrow(CANDIDATE_WINDOWS_SIZE30_table)) {
   #this_data_subset[is.nan(this_data_subset$piN), ]$piN <- NA
   this_data_subset_maxPiNCodon <- as.integer(this_data_subset[! is.na(this_data_subset$piN) & this_data_subset$piN == max(this_data_subset$piN, na.rm = TRUE), ]$codon_num)
   #View(this_data_subset)
+  if(length(this_data_subset_maxPiNCodon)>1){this_data_subset_maxPiNCodon <- this_data_subset_maxPiNCodon[1]}
   CANDIDATE_WINDOWS_SIZE30_table[i, ]$piN_max_codon <- this_data_subset_maxPiNCodon
   
   #View(this_data_subset)
@@ -1384,10 +1391,13 @@ for (i in 1:nrow(CANDIDATE_WINDOWS_SIZE30_table)) {
 CANDIDATE_WINDOWS_SIZE30_table$dN <- CANDIDATE_WINDOWS_SIZE30_table$N_diffs / CANDIDATE_WINDOWS_SIZE30_table$N_sites
 CANDIDATE_WINDOWS_SIZE30_table$dS <- CANDIDATE_WINDOWS_SIZE30_table$S_diffs / CANDIDATE_WINDOWS_SIZE30_table$S_sites
 CANDIDATE_WINDOWS_SIZE30_table$dNdS <- CANDIDATE_WINDOWS_SIZE30_table$dN / CANDIDATE_WINDOWS_SIZE30_table$dS
+CANDIDATE_WINDOWS_SIZE30_table$dNmdS <- CANDIDATE_WINDOWS_SIZE30_table$dN - CANDIDATE_WINDOWS_SIZE30_table$dS
 
 # SAVE
 #write_tsv(CANDIDATE_WINDOWS_SIZE30_table, "../results/CANDIDATE_WINDOWS_SIZE30_table_FULL.tsv")
+(CANDIDATE_WINDOWS_SIZE30_table_signif <- CANDIDATE_WINDOWS_SIZE30_table %>% filter(P_value<0.05))
 write_xlsx(CANDIDATE_WINDOWS_SIZE30_table, "../results/CANDIDATE_WINDOWS_SIZE30_table_FULL2.xlsx")
+write_xlsx(CANDIDATE_WINDOWS_SIZE30_table_signif, "../results/CANDIDATE_WINDOWS_SIZE30_table_Signif.xlsx")
 
 
 

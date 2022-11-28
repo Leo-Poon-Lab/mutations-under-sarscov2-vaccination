@@ -1,3 +1,5 @@
+library(ggpubr)
+
 add_residuals <- function(df,x_var,y_var,out_var){
 	genes = unique(df$gene)
 	df_out <- lapply(seq_along(genes), function(i) { # adjust by genes, good
