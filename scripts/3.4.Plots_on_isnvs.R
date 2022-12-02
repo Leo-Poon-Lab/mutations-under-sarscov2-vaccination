@@ -80,7 +80,7 @@ p_pi <- plot_reg(df_plot_pi, "Ct_value", "pi_ori", x_lab="Ct value", y_lab=expre
 p_pi_adj <- plot_reg(df_plot_pi, "Ct_value", "pi", x_lab="Ct value", y_lab=expression("Nucleotide diversity ("~pi~") (adjusted)")) 
 
 # p_out <- ((p_pre+ggtitle("A"))|(p_aft+ggtitle("B")))/(p_pre2+ggtitle("C")|(p_aft2+ggtitle("D")))/((p_maf+ggtitle("E"))|p_maf_adj+ggtitle("F"))/((p_pi+ggtitle("G"))|p_pi_adj+ggtitle("H"))
-p_out <- ((p_pre+ggtitle("A"))|(p_aft+ggtitle("B")))/(p_pre2+ggtitle("C")|(p_aft2+ggtitle("D")))/((p_pi+ggtitle("E"))|p_pi_adj+ggtitle("F"))
+p_out <- ((p_pre+ggtitle("A"))|(p_aft+ggtitle("B")))/((p_pi+ggtitle("C"))|p_pi_adj+ggtitle("D"))/(p_pre2+ggtitle("E")|(p_aft2+ggtitle("F")))
 ggsave("../results/n_per_kb_adjusted.pdf", width=10, height=10)
 
 

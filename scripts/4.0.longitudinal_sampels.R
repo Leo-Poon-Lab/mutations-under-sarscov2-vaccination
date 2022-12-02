@@ -96,6 +96,21 @@ df_bam_rst$muAF <- df_bam_rst$matches/df_bam_rst$reads_all
 save(df_bam_rst, file="../results/df_bam_rst_full_notpp_longitudinal.rdata")
 # load("../results/df_bam_rst_full_notpp_longitudinal.rdata")
 
+# compare consensus_base
+df_con_prop_shared <- lapply(samples_longitudinal, function(whp_id_i) { # calculate proportion of the shared mutations
+	# whp_id_i=c("WHP4977", "WHP4988")
+	print(whp_id_i)
+	df_tmp <- df_bam_rst %>% filter(sample %in% whp_id_i) %>% filter(reads_all>=10)
+	if(nrow(df_tmp)==0){return(NA)}
+	unq_samples <- unique(df_tmp$sample)	
+	df_tmp <- extra_info_from_pysamstats(df_tmp)
+	if(length(unq_samples)==1){return(NA)}
+	df_tmp <- left_join(df_tmp %>% filter(sample==unq_samples[1]) %>% select(pos, con_base) %>% unique(), df_tmp %>% filter(sample==unq_samples[2]) %>% select(pos, con_base) %>% unique(), "pos")
+	
+	return(tibble(sample_1=unq_samples[1], sample_2=unq_samples[2], con_base_eq=sum(df_tmp$con_base.x==df_tmp$con_base.y,na.rm=T), con_base_diff=sum(df_tmp$con_base.x!=df_tmp$con_base.y,na.rm=T)))
+})
+df_con_prop_shared <- bind_rows(df_con_prop_shared)
+
 # MAF_threshold <- 0.05
 MAF_threshold <- 0.025
 df_bam_rst_filter <- df_bam_rst %>% filter((muAF<(1-MAF_threshold)) & (muAF>MAF_threshold))
@@ -154,7 +169,7 @@ fn_check_serial_mut <- function(x){
 df_extra_info <- df_extra_info %>% arrange(pos) %>% group_by(sample) %>% mutate(check_serial_mut=fn_check_serial_mut(pos)) %>% ungroup() %>% filter(!check_serial_mut) # remove serial adjacent separate mutations
 
 df_prop_shared <- lapply(samples_longitudinal, function(whp_id_i) { # calculate proportion of the shared mutations
-	# whp_id_i="WHP2633"
+	# whp_id_i="WHP4845"
 	df_tmp <- df_extra_info %>% filter(whp_id %in% gsub("-.+$", "", whp_id_i)) %>% arrange(days)
 	if(nrow(df_tmp)==0){return(1)}
 	unq_samples <- unique(df_tmp$sample)	

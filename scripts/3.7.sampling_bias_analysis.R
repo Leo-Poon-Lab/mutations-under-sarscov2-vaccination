@@ -41,9 +41,14 @@ df_plot_n_gene_meta_adj$vaccine_doses <- factor(df_plot_n_gene_meta_adj$vaccine_
 df_meta$lineage_sim <- factor(df_meta$lineage_sim, levels = names(colors_lineage))
 # collection lag
 df_meta$detection_lag <- as.numeric(df_meta$`Report date` - ymd(df_meta$`Onset date`))
+range(df_meta$`Report date`)
 df_meta$collection_lag <- as.numeric(df_meta$collection_date - ymd(df_meta$`Onset date`))
 df_meta$collection_lag[df_meta$collection_lag>100] <- NA # one ourlier
 df_meta$collection_lag[df_meta$collection_lag<0] <- NA # one ourlier
+quantile(df_meta$collection_lag, na.rm=T, 1:100/100)
+median(df_meta$collection_lag, na.rm=T)
+mean(df_meta$collection_lag, na.rm=T)
+
 
 df_meta$vaccine_doses <- paste0(df_meta$Vaccine, "\n(Doses=", df_meta$Doses, ")")
 df_meta$vaccine_doses[df_meta$Vaccine=="Unvaccinated"] <- "Unvaccinated"
@@ -283,16 +288,29 @@ p_4_1_p <- p_4_1 +
 	geom_signif(y_position = 350+seq(0,4)*10, xmin = c(0.7, 0.7, 0.7, 1.1, 1.1)+1, xmax = c(0.9, 1.1, 1.3, 0.9, 1.3)+1, annotation = c("**", "**", "**", "**", "**"), color="black", vjust=0.65, tip_length = 0.01)
 ggsave("../results/days_since_last_dose_by_lineage.pdf", width=8, height=6)
 
+highlight_diff(df_test) %>% filter(p_value_adj<0.05) %>% filter(same_vaccine) %>% arrange(var1, var2) %>% select(var1, var2, p_value_adj, notation_adj) %>% t()
+
+p_4_2 <- plot_box(df_plot=df_meta %>% filter(Vaccine!="Unvaccinated"), x_var="vaccine_doses", y_var="days_since_last_dose", color_var="lineage_sim", y_lab="Days since last dose", x_lab="Vaccine")
+p_4_2 <- p_4_2 + scale_color_manual(name="Vaccine", values=colors_lineage[4:5])
+
+p_4_2_p <- p_4_2 +
+	geom_signif(y_position = 350+seq(0,0)*10, xmin = c(0.8)+0, xmax = c(1.2)+0, annotation = c("**"), color="black", vjust=0.65, tip_length = 0.01)
+ggsave("../results/days_since_last_dose_by_vaccine.pdf", width=8, height=6)
+
+source("./helper/plot_reg.R")
+df_plot_n_gene_meta_adj <- left_join(df_plot_n_gene_meta_adj, df_meta %>% select(sample, days_since_last_dose), "sample")
+plot_reg(df_plot_n_gene_meta_adj %>% filter(Vaccine!="Unvaccinated"), "days_since_last_dose", "n_per_kb_adj", x_lab="Days since last dose", y_lab="Number of iSNVs per Kb (adjusted)")
+ggsave("../results/cor_days_since_last_dose_by_n_per_kb_adj.pdf", width=8, height=6)
+
 # Age, chronic disease, condition
 df_meta$Age <- as.numeric(df_meta$"Age (yr)")
 df_test <- cal_wilc_test(df_meta, "Age", genes=NA)
 highlight_diff(df_test) %>% filter(check_p_adj) %>% arrange(var1, var2) %>% select(var1, var2, p_value_adj, notation_adj) %>% t()
 
-source("./helper/plot_reg.R")
 df_plot_n_gene_meta_adj <- left_join(df_plot_n_gene_meta_adj, df_meta %>% select(sample, Age), "sample")
 p5_01 <- plot_reg(df_meta, "Age", "Ct_value", y_lab="Ct value")
 p5_02 <- plot_reg(df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), "Age", "n_per_kb_adj", y_lab="Number of iSNVs per Kb (adjusted)", x_lab="Age")
-p5_out <- p5_01/p5_02
+p5_out <- (p5_01+ggtitle("A"))/(p5_02+ggtitle("B"))
 ggsave("../results/cor_age_vs_n_per_kd_adj.pdf", width=8, height=8)
 
 

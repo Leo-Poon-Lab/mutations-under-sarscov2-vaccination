@@ -38,7 +38,7 @@ plot_depth <- function(samples_cur_batch, file_prefix, sample_names=NA){
 
 	if(is.na(sample_names)){df_rc_slide_all$sample_names=df_rc_slide_all$sample}else{df_rc_slide_all$sample_names=factor(df_rc_slide_all$sample, levels=samples_cur_batch, labels=sample_names)}
 
-	ggplot(df_rc_slide_all)+
+	p_out <- ggplot(df_rc_slide_all)+
 		geom_line(aes(x=pos, y=log10(depth), group=sample, color=sample), data=. %>% filter(pos%%50==0), alpha=0.28, show.legend = F)+
 		# geom_line(aes(x=pos, y=log10(depth)), alpha = 0.8, data=df_rc_bind %>% filter(pos%%50==0), color="dark red")+
 		# geom_line(aes(x=pos, y=log10(depth), color=sample), alpha = 0.8, data=df_rc_slide_new_primer %>% filter(pos%%50==0))+
@@ -51,9 +51,9 @@ plot_depth <- function(samples_cur_batch, file_prefix, sample_names=NA){
 		# ylab("Depth (number of reads, slide window of 200bp)")+
 		xlab("Position")+
 		NULL
-	ggsave(paste0(file_prefix, ".pdf"), width = 12, height = 8)
+	ggsave(paste0(file_prefix, ".pdf"), width = 12, height = 8, plot=p_out)
 	write_csv(df_rc_slide_all %>% group_by(sample) %>% summarise(mean_slide_depth=mean(depth)), paste0(file_prefix, ".csv"))
 	# writeLines(samples_selected, "../results/samples_selected.txt")
-
+	p_out
 }
 

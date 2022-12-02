@@ -53,25 +53,33 @@ df_extra_info$primer[is.na(df_extra_info$primer)] <- "new" # RE-WHP2800
 ### filtering (QC) by position
 #### 1. positions 1:100 and (29903-99):29903 should be removed; 
 #### 2. exclude all positions in the PCR primer binding regions
-source("./helper/isnv_position_filter.R")
-df_extra_info <- filter_by_pos(df_extra_info)
 
 ### MAF threshold
 df_extra_info <- df_extra_info %>% filter(sec_freq>=MAF_threshold) # MAF>=0.025
+length(unique(df_extra_info$sample))
+
+### filter by position
+source("./helper/isnv_position_filter.R")
+df_extra_info <- filter_by_pos(df_extra_info)
+length(unique(df_extra_info$sample))
 
 ### Depth threshold
 df_extra_info <- df_extra_info %>% filter(depth>=100) # Depth
+length(unique(df_extra_info$sample))
 
 ### filter structural variants
 df_extra_info <- df_extra_info %>% filter(nchar(con_base)==1) # only single-nt mutations
 df_extra_info <- df_extra_info %>% filter(nchar(sec_base)==1) # only single-nt mutations
 length(unique(df_extra_info$sample))
 
+#### filter strand bias
+df_extra_info <- df_extra_info %>% filter(strand_bias<10) 
+length(unique(df_extra_info$sample))
+
 #### The identified mutations/variants should be supported by at least one forward and one reverse read); 
 # df_extra_info <- df_extra_info %>% filter((as.numeric(sec_fwd)+as.numeric(sec_rev))>=5 & as.numeric(sec_fwd)>=1 & as.numeric(sec_rev)>=1)
 df_extra_info <- df_extra_info %>% filter(as.numeric(sec_fwd)>=1 & as.numeric(sec_rev)>=1)
-#### filter strand bias
-df_extra_info <- df_extra_info %>% filter(strand_bias<10) 
+length(unique(df_extra_info$sample))
 
 #### filter serial adjacent disjoint mutations
 fn_check_serial_mut <- function(x){
@@ -86,6 +94,7 @@ fn_check_serial_mut <- function(x){
 }
 # fn_check_serial_mut(c(7102,7123,7142,7150,7219,7234,7319,7384))
 df_extra_info <- df_extra_info %>% arrange(pos) %>% group_by(sample) %>% mutate(check_serial_mut=fn_check_serial_mut(pos)) %>% ungroup() %>% filter(!check_serial_mut) # remove serial adjacent separate mutations
+length(unique(df_extra_info$sample))
 
 #### remove possible contamination
 df_tmp <- df_extra_info %>% group_by(sample, lineage_sim, Vaccine) %>% summarise(n=n()) %>% arrange(desc(n))
@@ -97,6 +106,7 @@ check <- df_tmp$n>quantile(df_tmp$n,1:100/100)[99]
 # df_meta %>% select(sample, lineage_sim, Vaccine, Ct_value) %>% filter(sample %in% samples_extreme) %>% print(n=50)
 write_csv(df_tmp %>% filter(sample %in% samples_extreme), "../results/samples_extreme_high_num_of_SNPs.csv") 
 df_extra_info <- df_extra_info %>% filter(!sample %in% samples_extreme)
+length(unique(df_extra_info$sample))
 
 df_tmp <- df_extra_info %>% select(pos, con_base, sec_base)
 ## annotate gene and mutations

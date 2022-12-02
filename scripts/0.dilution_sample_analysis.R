@@ -14,6 +14,7 @@ library(ggbreak)
 source("./helper/pysamstats.r")
 
 df_ct_info <- readxl::read_excel("../data/dilution/VOC0013 PCR Novaseq dilution.xlsx")
+df_ct_info <- df_ct_info %>% filter(Sample!="VOC0013-e-4") # e-4 sample failed
 df_ct_info$Ct <- round(as.numeric(df_ct_info$Ct),2)
 df_ct_info$info <- paste0(df_ct_info$Sample, " (Ct:", df_ct_info$Ct, ")")
 df_ct_info$color <- NA
@@ -45,10 +46,10 @@ read_pysamstats_dilution <- function(x, pp=TRUE) {
 }
 
 df_bam_rst <- mclapply(files_bam_rst_full, read_pysamstats_dilution, pp=FALSE, mc.cores=16)
+stopifnot(all(sapply(df_bam_rst, nrow)==29903))
 df_bam_rst <- bind_rows(df_bam_rst[!is.na(df_bam_rst)])
 samples_all <- unique(df_bam_rst$sample)
 samples_ref <- "VOC0013-e-1"
-stopifnot(nrow(df_bam_rst)==length(samples_all)*29903)
 
 # df_bam_rst$sample <- factor(df_bam_rst$sample, samples_all)
 # levels(df_bam_rst$sample)
@@ -69,8 +70,8 @@ df_extra_info <- full_join(df_bam_rst %>% mutate(depth=reads_all) %>% select(pos
 
 # sequencing depth
 source("./helper/plot_coverage.r")
-plot_depth(samples_all, "../results/dilution_depth", sample_names=NA)
-plot_depth(df_ct_info$Sample[2:18], "../results/dilution_depth_Ct", sample_names=df_ct_info$info[2:18])
+# plot_depth(samples_all, "../results/dilution_depth", sample_names=NA)
+p_depth <- plot_depth(df_ct_info$Sample[2:18], "../results/dilution_depth_Ct", sample_names=df_ct_info$info[2:18])
 
 ## mismatch of consensus_base
 df_extra_info_ref <- df_extra_info %>% filter(sample == samples_ref)
@@ -287,7 +288,7 @@ p4_2 <- ggplot(df_num_isnvs)+
 	theme_minimal()+
 	theme(legend.position='bottom')+
 	NULL
-
-p4 <- (p4_1+ggtitle("A"))/(p4_2+ggtitle("B"))+plot_layout(heights = c(1, 1))
-ggsave("../results/Dilution_genome_coverage.pdf", height=8, width=8)
+p4_btm <- ((p4_1+ggtitle("B"))/(p4_2+ggtitle("C"))+plot_layout(heights = c(1, 1.2)))
+p4 <- (p_depth+theme_minimal()+ggtitle("A"))/p4_btm+plot_layout(heights = c(0.6, 1))
+ggsave("../results/Dilution_genome_coverage.pdf", height=10, width=8)
 

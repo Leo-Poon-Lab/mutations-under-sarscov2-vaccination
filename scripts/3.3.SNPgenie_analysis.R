@@ -709,6 +709,9 @@ intrahost_results_bootstrap$outbreak <- gsub("(Doses=2) ", "(Doses=2)\n", intrah
 intrahost_results_bootstrap$outbreak <- gsub("(Doses=3) ", "(Doses=3)\n", intrahost_results_bootstrap$outbreak, fixed=T)
 intrahost_results_bootstrap$outbreak <- gsub("Unvaccinated ", "Unvaccinated\n", intrahost_results_bootstrap$outbreak, fixed=T)
 
+intrahost_results_bootstrap_out <- intrahost_results_bootstrap
+intrahost_results_bootstrap_out %>% mutate(gene_name_out=gene_name, Group_out=outbreak, piN_round=round(dN*10^5,2), piN_SE_round=round(boot_dN_SE*10^5,2), piS_round=round(dS*10^5,2), piS_SE_round=round(boot_dS_SE*10^5,2), piN_out=paste0(piN_round, " (", piN_round-piN_SE_round, "~", piN_round+piN_SE_round, ")"), piS_out=paste0(piS_round, " (", piS_round-piS_SE_round, "~", piS_round+piS_SE_round, ")"), dN_m_dS_out=round(dN_m_dS*10^5,2), P_value_out=round(P_value,4)) %>% select(contains("_out")) %>% writexl::write_xlsx("../results/df_piN_piS_diff.xlsx")
+
 ### CONVERT TO LONG
 intrahost_results_bootstrap_LONG <- intrahost_results_bootstrap %>%
   pivot_longer(cols = c('dN', 'dS'), names_to = "d_measure", values_to = "d_value")

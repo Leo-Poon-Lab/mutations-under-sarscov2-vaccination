@@ -60,16 +60,26 @@ df_snvs_meta_add_qc$vaccine_doses <- paste0(df_snvs_meta_add_qc$Vaccine, " (Dose
 df_snvs_meta_add_qc$vaccine_doses[df_snvs_meta_add_qc$Vaccine=="Unvaccinated"] <- "Unvaccinated"
 
 # unique(df_snvs_meta_add_qc$effect_sim)
-# df_snvs_meta_add_qc %>% group_by(effect_sim) %>% summarise(n=n(), prop=n/nrow(df_snvs_meta_add_qc))
+df_snvs_meta_add_qc %>% group_by(effect_sim) %>% summarise(n=n(), prop=round(n/nrow(df_snvs_meta_add_qc), 3)*100)
 
 # Basic stats on iSNVs
 ## number of iSNVs per sample
+# tmp <- df_snvs_meta_add_qc %>% filter(sec_freq<0.05) %>% .$effect_sim %>% table()
+# tmp/sum(tmp) # MAF between 0.025 and 0.05, higher number of non-syn muts
+# tmp <- df_snvs_meta_add_qc %>% filter(sec_freq>=0.05) %>% .$effect_sim %>% table()
+# tmp/sum(tmp) # MAF above 0.05
+
+nrow(df_snvs_meta_add_qc) # num of identified iSNVs
+length(unique(df_snvs_meta_add_qc$pos)) # unique sites of iSNVs
 df_n_isnvs <- df_snvs_meta_add_qc %>% group_by(sample) %>% summarise(n=n()) %>% arrange(desc(n))
 df_tmp <- df_meta %>% select(sample,Ct_value) %>% left_join(df_n_isnvs)
 df_tmp$n[is.na(df_tmp$n)] <- 0
-sum(df_tmp$n==0)
-(n_isnvs_mean <- mean(df_tmp$n))
-(n_isnvs_median <- median(df_tmp$n))
+sum(df_tmp$n==0) # num of samples without iSNVs
+round(sum(df_tmp$n==0)/nrow(df_tmp),3)*100 # Prop of samples without iSNVs
+sum(df_tmp$n!=0) # num of samples having iSNVs
+round(sum(df_tmp$n!=0)/nrow(df_tmp),3)*100 # Prop of samples having iSNVs
+(n_isnvs_mean <- round(mean(df_tmp$n),2))
+(n_isnvs_median <- round(median(df_tmp$n),2))
 df_tmp$Ct_value_break <- cut(df_tmp$Ct_value, 3)
 
 # df_tmp %>% filter(n>50) %>% group_by(Ct_value_break) %>% summarise(n())
@@ -96,9 +106,9 @@ p_n_isnvs <- ggplot(df_tmp) +
 table(df_snvs_meta_add_qc$effect_sim)
 df_snvs_meta_add_qc <- df_snvs_meta_add_qc %>% mutate(mutation=paste0(con_base,pos,sec_base))
 df_tmp <- df_snvs_meta_add_qc %>% group_by(mutation, effect_sim) %>% summarise(n=n())
-sum(df_tmp$n>1) # 4147
-sum(df_tmp$n==1) # 11406
-sum(df_tmp$n==1)/nrow(df_tmp) # 70.76%
+sum(df_tmp$n>1) # num of recurrent iSNVs
+sum(df_tmp$n==1) # num of once iSNVs
+round(sum(df_tmp$n==1)/nrow(df_tmp), 3)*100 # uniquely observed in a single patient sample
 table(df_tmp$n)
 
 p_n_sharing <- ggplot(df_tmp %>% ungroup() %>% group_by(effect_sim,n) %>% summarise(n_group=n(), n_group_log10=log10(n_group))) +
