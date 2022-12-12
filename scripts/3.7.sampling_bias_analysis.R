@@ -214,7 +214,7 @@ highlight_diff <- function(df){
 	var1_split <- strsplit(df$var1, "_", fixed=T)
 	var2_split <- strsplit(df$var2, "_", fixed=T)
 	check1 <- sapply(var1_split, function(x)x[1]) == sapply(var2_split, function(x)x[1]) # Vaccine
-	check2 <- sapply(var1_split, function(x)x[2]) == sapply(var2_split, function(x)x[2]) # specimen type
+	# check2 <- sapply(var1_split, function(x)x[2]) == sapply(var2_split, function(x)x[2]) # specimen type
 	check3 <- sapply(var1_split, function(x)x[3]) == sapply(var2_split, function(x)x[3]) # lineage
 	
 	df$same_vaccine <- check1

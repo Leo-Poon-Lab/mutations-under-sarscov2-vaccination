@@ -26,10 +26,10 @@ df_f5b_delta_cd4 <- df_f5b_delta_cd4 %>% mutate(type = "Delta (Hong Kong-specifi
 df_f5b_omicron_cd8 <- df_f5b_omicron_cd8 %>% mutate(type = "Omicron (Hong Kong-specific epitopes)", T_cell="CD8+") %>% pivot_longer(contains("Omicron"))
 df_f5b_omicron_cd4 <- df_f5b_omicron_cd4 %>% mutate(type = "Omicron (Hong Kong-specific epitopes)", T_cell="CD4+") %>% pivot_longer(contains("Omicron"))
 
-df_fs10a_delta_cd8 <- read_excel("../results/from_ust//Data_FigureS9A.xlsx", sheet=1)
-df_fs10a_delta_cd4 <- read_excel("../results/from_ust//Data_FigureS9A.xlsx", sheet=2)
-df_fs10a_omicron_cd8 <- read_excel("../results/from_ust//Data_FigureS9A.xlsx", sheet=3)
-df_fs10a_omicron_cd4 <- read_excel("../results/from_ust//Data_FigureS9A.xlsx", sheet=4)
+df_fs10a_delta_cd8 <- read_excel("../results/from_ust//Data_FigureS8A.xlsx", sheet=1)
+df_fs10a_delta_cd4 <- read_excel("../results/from_ust//Data_FigureS8A.xlsx", sheet=2)
+df_fs10a_omicron_cd8 <- read_excel("../results/from_ust//Data_FigureS8A.xlsx", sheet=3)
+df_fs10a_omicron_cd4 <- read_excel("../results/from_ust//Data_FigureS8A.xlsx", sheet=4)
 df_fs10a_delta_cd8 <- df_fs10a_delta_cd8 %>% mutate(type = "Delta (All epitopes)", T_cell="CD8+") %>% pivot_longer(contains("Delta"))
 df_fs10a_delta_cd4 <- df_fs10a_delta_cd4 %>% mutate(type = "Delta (All epitopes)", T_cell="CD4+") %>% pivot_longer(contains("Delta"))
 df_fs10a_omicron_cd8 <- df_fs10a_omicron_cd8 %>% mutate(type = "Omicron (All epitopes)", T_cell="CD8+") %>% pivot_longer(contains("Omicron"))
@@ -57,7 +57,7 @@ unique(df_f5a$name_new)
 names(colors_vaccine_doses)
 
 p_5a <- ggplot(df_f5a) +
-	geom_boxplot(aes(x=name_new, y=value, fill=name_new), alpha=0.8)+
+	geom_boxplot(aes(x=name_new, y=value, fill=name_new), alpha=0.8, size=0.2, outlier.size=0.2)+
 	facet_grid(rows=vars(T_cell), cols=vars(type), scales="free_x")+
 	theme_classic()+
 	scale_fill_manual(name="Vaccine",values=colors_vaccine_doses)+
@@ -75,7 +75,7 @@ df_f5b$lineage <- gsub(".+ ", "", df_f5b$name)
 df_f5b$name_new <- gsub(" 21\\D .+$", "", df_f5b$name)
 
 p_5b <- ggplot(df_f5b) +
-	geom_boxplot(aes(x=name_new, y=value, fill=name_new), alpha=0.8)+
+	geom_boxplot(aes(x=name_new, y=value, fill=name_new), alpha=0.8, size=0.2, outlier.size=0.2)+
 	facet_grid(rows=vars(T_cell), cols=vars(type), scales="free_x")+
 	theme_classic()+
 	scale_fill_manual(name="Vaccine", values=colors_vaccine_doses)+

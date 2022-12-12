@@ -7,16 +7,16 @@ df_spike_region <- read_tsv("../data/spike_region.tsv")
 df_snvs_meta_add_qc <- read_csv("../results/df_snvs_meta_add_qc_bam_adj.csv", guess_max=600000)
 df_snvs_meta_add_qc$Vaccine <- gsub("BioNTech", "Comirnaty", df_snvs_meta_add_qc$Vaccine)
 df_snvs_meta_add_qc$Vaccine <- gsub("Sinovac", "CoronaVac", df_snvs_meta_add_qc$Vaccine)
-df_snvs_meta_add_qc$vaccine_doses <- paste0(df_snvs_meta_add_qc$Vaccine, "\n(Doses=", df_snvs_meta_add_qc$Doses, ")")
-df_snvs_meta_add_qc$vaccine_doses[df_snvs_meta_add_qc$Vaccine=="Unvaccinated"] <- "Unvaccinated"
+df_snvs_meta_add_qc$vaccine_doses <- paste0(df_snvs_meta_add_qc$Vaccine, "(Doses=", df_snvs_meta_add_qc$Doses, ")\n")
+df_snvs_meta_add_qc$vaccine_doses[df_snvs_meta_add_qc$Vaccine=="Unvaccinated"] <- "Unvaccinated\n"
 df_snvs_meta_add_qc <- df_snvs_meta_add_qc %>% mutate(Group=paste(vaccine_doses, lineage_sim))
 
 df_meta <- read_csv("../results/df_samples.csv", guess_max=100000)
 df_meta <- df_meta %>% filter(lineage_sim != "22B (Omicron, BA.5.*)")
 df_meta$Vaccine <- gsub("BioNTech", "Comirnaty", df_meta$Vaccine)
 df_meta$Vaccine <- gsub("Sinovac", "CoronaVac", df_meta$Vaccine)
-df_meta$vaccine_doses <- paste0(df_meta$Vaccine, "\n(Doses=", df_meta$Doses, ")")
-df_meta$vaccine_doses[df_meta$Vaccine=="Unvaccinated"] <- "Unvaccinated"
+df_meta$vaccine_doses <- paste0(df_meta$Vaccine, "(Doses=", df_meta$Doses, ")\n")
+df_meta$vaccine_doses[df_meta$Vaccine=="Unvaccinated"] <- "Unvaccinated\n"
 
 df_tmp <- df_meta %>% mutate(Group=paste(vaccine_doses, lineage_sim)) %>% group_by(Group) %>% summarise(N=n(), Group_more=paste0(Group, "\n(N=", N, ")")) %>% unique()
 
@@ -71,7 +71,7 @@ pdf("../results/spike_muts_Omicron.pdf", width=10, height=20)
 lolliplot_mod(muts_list[idx2], features_list[idx2], yaxis=FALSE)
 dev.off()
 
-idx_all <- c(idx1, idx2)
+idx_all <- c(idx2, idx1)
 pdf("../results/spike_muts_all.pdf", width=10, height=20)
 lolliplot_mod(muts_list[idx_all], features_list[idx_all], yaxis=TRUE)
 dev.off()

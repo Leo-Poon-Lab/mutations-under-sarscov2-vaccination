@@ -9,6 +9,9 @@ data_meta_raw <- data_meta_raw_ori %>% filter(sequenced_by_us) %>% filter(!is.na
 data_meta_study <- read_csv("../results/df_samples.csv", guess_max=100000)
 data_meta_study <- data_meta_study %>% filter(lineage_sim != "22B (Omicron, BA.5.*)")
 
+sum(data_meta_study$Ct_value>25, na.rm=T)
+
+
 # logitudinal samples 1
 df_voc_logitudinal <- readxl::read_excel("../data/VOC longi samples for Iseq.xlsx")
 df_voc_logitudinal$Lab_ID <- gsub("VOC0", "VOC", df_voc_logitudinal$Lab_ID)
@@ -41,6 +44,9 @@ case_id_longitudinal <- df_samples_controls_summary %>% filter(diff_collection_d
 df_whp_logitudinal <- df_samples_controls %>% filter(case_id %in% case_id_longitudinal) %>% filter(sequencer=="Novaseq")
 
 samples_longitudinal <- c(df_voc_logitudinal %>% group_by(Case) %>% summarise(sample_list=list(sample)) %>% .$sample_list, df_whp_logitudinal %>% group_by(case_id) %>% summarise(sample_list=list(sample)) %>% .$sample_list)
+
+data_meta_raw %>% filter(case_id %in% c(df_voc_logitudinal$Case, df_whp_logitudinal$case_id)) %>% select(case_id, lineage, samples_all, contains("Name of")) # case info
+
 
 source("./helper/pysamstats.r")
 # read bamreadcounts of the control samples
@@ -109,7 +115,10 @@ df_con_prop_shared <- lapply(samples_longitudinal, function(whp_id_i) { # calcul
 	
 	return(tibble(sample_1=unq_samples[1], sample_2=unq_samples[2], con_base_eq=sum(df_tmp$con_base.x==df_tmp$con_base.y,na.rm=T), con_base_diff=sum(df_tmp$con_base.x!=df_tmp$con_base.y,na.rm=T)))
 })
-df_con_prop_shared <- bind_rows(df_con_prop_shared)
+df_con_prop_shared <- bind_rows(df_con_prop_shared[!is.na(df_con_prop_shared)])
+median(df_con_prop_shared$con_base_diff)
+mean(df_con_prop_shared$con_base_diff)
+
 
 # MAF_threshold <- 0.05
 MAF_threshold <- 0.025

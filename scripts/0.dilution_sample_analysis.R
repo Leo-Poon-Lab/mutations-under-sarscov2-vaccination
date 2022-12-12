@@ -16,7 +16,8 @@ source("./helper/pysamstats.r")
 df_ct_info <- readxl::read_excel("../data/dilution/VOC0013 PCR Novaseq dilution.xlsx")
 df_ct_info <- df_ct_info %>% filter(Sample!="VOC0013-e-4") # e-4 sample failed
 df_ct_info$Ct <- round(as.numeric(df_ct_info$Ct),2)
-df_ct_info$info <- paste0(df_ct_info$Sample, " (Ct:", df_ct_info$Ct, ")")
+df_ct_info$info <- df_ct_info$Sample
+df_ct_info$info[6:18] <- paste0(gsub("VOC0013-", "", df_ct_info$Sample[6:18]), " (Ct:", df_ct_info$Ct[6:18], ")")
 df_ct_info$color <- NA
 df_ct_info$color[2:10] <- scico(9, palette = 'batlow')
 df_ct_info$color[is.na(df_ct_info$color)] <- "#000000"
@@ -25,7 +26,7 @@ files_bam <- list.files("~/../../Volumes/Backup/Haogao/work/2020/2020-09-01_COVI
 files_bam_full <- list.files("~/../../Volumes/Backup/Haogao/work/2020/2020-09-01_COVID_NGS_pipeline/archive_bam/", "bam$", full.names = T)
 files_bam_int <- naturalsort(files_bam_full[grepl("VOC0013-e", files_bam_full)])
 
-process_pysamstats(files_bam_int, n_cores=8)
+# process_pysamstats(files_bam_int, n_cores=8)
 files_bam_rst_full <- c(list.files("../results/pysamstats/", "tsv$", full.names = T))
 files_bam_rst_full <- naturalsort(files_bam_rst_full[grepl("VOC0013-e", files_bam_rst_full)])
 stopifnot(sum(is.na(files_bam_rst_full))==0)
@@ -71,7 +72,7 @@ df_extra_info <- full_join(df_bam_rst %>% mutate(depth=reads_all) %>% select(pos
 # sequencing depth
 source("./helper/plot_coverage.r")
 # plot_depth(samples_all, "../results/dilution_depth", sample_names=NA)
-p_depth <- plot_depth(df_ct_info$Sample[2:18], "../results/dilution_depth_Ct", sample_names=df_ct_info$info[2:18])
+p_depth <- plot_depth(df_ct_info$Sample[2:17], "../results/dilution_depth_Ct", sample_names=df_ct_info$info[2:17])
 
 ## mismatch of consensus_base
 df_extra_info_ref <- df_extra_info %>% filter(sample == samples_ref)
@@ -111,7 +112,7 @@ df_indels_true_positive_minor <- df_extra_info %>% filter(sec_freq>=0.01) %>% fi
 source("./helper/isnv_position_filter.R")
 df_extra_info$primer <- "new"
 pos_indels <- c(df_indels_true_positive_major$pos, df_indels_true_positive_minor$pos)
-df_extra_info <- filter_by_pos(df_extra_info, pos_indels=pos_indels)
+if(length(pos_indels)>0){df_extra_info <- filter_by_pos(df_extra_info, pos_indels=pos_indels)}
 
 # df_extra_info %>% filter(sec_freq>=0.01) %>% filter(depth>=10) %>% group_by(sample) %>% summarise(n=n())
 # df_extra_info %>% filter(sec_freq>=0.02) %>% filter(depth>=10) %>% group_by(sample) %>% summarise(n=n())
@@ -129,7 +130,7 @@ df_roc <- full_join(df_extra_info %>% filter(sec_freq>=0.01) %>% select("sample"
 df_roc$tp <- !is.na(df_roc$n)
 df_roc <- left_join(df_roc %>% mutate(Sample=sample), df_ct_info %>% mutate(info=gsub("VOC0013-", "", info)), "Sample")
 
-p1 <- ggplot(df_roc %>% filter(sample %in% samples_all[1:9]), aes(d=tp, m=depth, color=info, fill=info))+
+p1 <- ggplot(df_roc %>% filter(sample %in% samples_all[1:8]), aes(d=tp, m=depth, color=info, fill=info))+
 	geom_roc(n.cuts = 5, labelsize = 2, alpha=0.8) + 
 	geom_rocci(ci.at = c(100), labels=F, linetype=1, size=0.5, show.legend = FALSE)+
 	# geom_rocci(ci.at = c(10), labels=F, linetype=2, size=0.5, show.legend = FALSE)+
@@ -148,7 +149,7 @@ df_roc_depth_100$tp <- !is.na(df_roc_depth_100$n)
 df_roc_depth_100 <- left_join(df_roc_depth_100 %>% mutate(Sample=sample), df_ct_info %>% mutate(info=gsub("VOC0013-", "", info)), "Sample")
 df_roc_depth_100 %>% filter(sample=="VOC0013-e-4") %>% filter(tp)
 
-p2 <- ggplot(df_roc_depth_100 %>% filter(sample %in% samples_all[1:9]), aes(d=tp, m=sec_freq))+
+p2 <- ggplot(df_roc_depth_100 %>% filter(sample %in% samples_all[1:8]), aes(d=tp, m=sec_freq))+
 	geom_roc(cutoffs.at = 1:5/100, labelsize = 2, labelround = 2, alpha=0.88) + 
 	geom_rocci(ci.at = c(0.025), labels=F, linetype=1, size=0.5, show.legend = FALSE, fill="dark red")+
 	# geom_rocci(ci.at = c(0.02), labels=F, linetype=2, size=0.5, show.legend = FALSE, fill="dark blue")+
@@ -161,7 +162,7 @@ p2 <- ggplot(df_roc_depth_100 %>% filter(sample %in% samples_all[1:9]), aes(d=tp
 ggsave("../results/Dilution_threshold_maf.pdf", width=10, height=10)
 
 df_auc <- calc_auc(p2) %>% print()
-df_thred_optimal <- lapply(samples_all[1:9], function(sample_i){
+df_thred_optimal <- lapply(samples_all[1:8], function(sample_i){
 	df_tmp <- df_roc_depth_100 %>% filter(sample %in% sample_i)
 	my_curve <- roc(df_tmp$tp, df_tmp$sec_freq, direction="<")
 	df_thred <- coords(my_curve, x=1:20/200)
@@ -190,7 +191,7 @@ df_roc_thresholds <- lapply(depth_cuts, function(depth_cut_i){
 df_roc_thresholds <- bind_rows(df_roc_thresholds)
 df_roc_thresholds$depth_cut <- factor(df_roc_thresholds$depth_cut, depth_cuts)
 
-p3_001 <- ggplot(df_roc_thresholds %>% filter(sample %in% samples_all[1:9]), aes(d=tp, m=sec_freq, color=depth_cut, fill=depth_cut))+
+p3_001 <- ggplot(df_roc_thresholds %>% filter(sample %in% samples_all[1:8]), aes(d=tp, m=sec_freq, color=depth_cut, fill=depth_cut))+
 	# geom_roc(cutoffs.at = 1:5/100, labelsize = 2, labelround = 2, alpha=0.88) + 
 	geom_roc(n.cuts = 0, labelsize = 2, labelround = 2, alpha=0.88) + 
 	geom_rocci(ci.at = c(0.01), labels=F, linetype=2, size=0.5, show.legend = FALSE)+
@@ -202,7 +203,7 @@ p3_001 <- ggplot(df_roc_thresholds %>% filter(sample %in% samples_all[1:9]), aes
 	ggtitle(paste0("A (MAF cutoff:", 0.01, ")"))+
 	# scale_x_continuous(guide = guide_axis(n.dodge=1))+
 	NULL
-p3_002 <- ggplot(df_roc_thresholds %>% filter(sample %in% samples_all[1:9]), aes(d=tp, m=sec_freq, color=depth_cut, fill=depth_cut))+
+p3_002 <- ggplot(df_roc_thresholds %>% filter(sample %in% samples_all[1:8]), aes(d=tp, m=sec_freq, color=depth_cut, fill=depth_cut))+
 	# geom_roc(cutoffs.at = 1:5/100, labelsize = 2, labelround = 2, alpha=0.88) + 
 	geom_roc(n.cuts = 0, labelsize = 2, labelround = 2, alpha=0.88) + 
 	geom_rocci(ci.at = c(0.02), labels=F, linetype=2, size=0.5, show.legend = FALSE)+
@@ -214,7 +215,7 @@ p3_002 <- ggplot(df_roc_thresholds %>% filter(sample %in% samples_all[1:9]), aes
 	ggtitle(paste0("B (MAF cutoff:", 0.02, ")"))+
 	# scale_x_continuous(guide = guide_axis(n.dodge=1))+
 	NULL
-p3_003 <- ggplot(df_roc_thresholds %>% filter(sample %in% samples_all[1:9]), aes(d=tp, m=sec_freq, color=depth_cut, fill=depth_cut))+
+p3_003 <- ggplot(df_roc_thresholds %>% filter(sample %in% samples_all[1:8]), aes(d=tp, m=sec_freq, color=depth_cut, fill=depth_cut))+
 	# geom_roc(cutoffs.at = 1:5/100, labelsize = 2, labelround = 2, alpha=0.88) + 
 	geom_roc(n.cuts = 0, labelsize = 2, labelround = 2, alpha=0.88) + 
 	geom_rocci(ci.at = c(0.03), labels=F, linetype=2, size=0.5, show.legend = FALSE)+
@@ -226,7 +227,7 @@ p3_003 <- ggplot(df_roc_thresholds %>% filter(sample %in% samples_all[1:9]), aes
 	ggtitle(paste0("C (MAF cutoff:", 0.03, ")"))+
 	# scale_x_continuous(guide = guide_axis(n.dodge=1))+
 	NULL
-p3_004 <- ggplot(df_roc_thresholds %>% filter(sample %in% samples_all[1:9]), aes(d=tp, m=sec_freq, color=depth_cut, fill=depth_cut))+
+p3_004 <- ggplot(df_roc_thresholds %>% filter(sample %in% samples_all[1:8]), aes(d=tp, m=sec_freq, color=depth_cut, fill=depth_cut))+
 	# geom_roc(cutoffs.at = 1:5/100, labelsize = 2, labelround = 2, alpha=0.88) + 
 	geom_roc(n.cuts = 0, labelsize = 2, labelround = 2, alpha=0.88) + 
 	geom_rocci(ci.at = c(0.04), labels=F, linetype=2, size=0.5, show.legend = FALSE)+
@@ -238,7 +239,7 @@ p3_004 <- ggplot(df_roc_thresholds %>% filter(sample %in% samples_all[1:9]), aes
 	ggtitle(paste0("D (MAF cutoff:", 0.04, ")"))+
 	# scale_x_continuous(guide = guide_axis(n.dodge=1))+
 	NULL
-p3_005 <- ggplot(df_roc_thresholds %>% filter(sample %in% samples_all[1:9]), aes(d=tp, m=sec_freq, color=depth_cut, fill=depth_cut))+
+p3_005 <- ggplot(df_roc_thresholds %>% filter(sample %in% samples_all[1:8]), aes(d=tp, m=sec_freq, color=depth_cut, fill=depth_cut))+
 	# geom_roc(cutoffs.at = 1:5/100, labelsize = 2, labelround = 2, alpha=0.88) + 
 	geom_roc(n.cuts = 0, labelsize = 2, labelround = 2, alpha=0.88) + 
 	geom_rocci(ci.at = c(0.05), labels=F, linetype=2, size=0.5, show.legend = FALSE)+
@@ -291,4 +292,6 @@ p4_2 <- ggplot(df_num_isnvs)+
 p4_btm <- ((p4_1+ggtitle("B"))/(p4_2+ggtitle("C"))+plot_layout(heights = c(1, 1.2)))
 p4 <- (p_depth+theme_minimal()+ggtitle("A"))/p4_btm+plot_layout(heights = c(0.6, 1))
 ggsave("../results/Dilution_genome_coverage.pdf", height=10, width=8)
+
+
 
