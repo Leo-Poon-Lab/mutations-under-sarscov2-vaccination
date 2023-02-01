@@ -1,4 +1,5 @@
 /data/*
+/metadata/df_samples.csv
 /results/*
 /results_005/*
 /scripts_005/*
