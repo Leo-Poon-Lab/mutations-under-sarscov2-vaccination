@@ -7,3 +7,4 @@
 *.zip
 .DS_Store
 notes.md
+/scripts/5.raw_data_submission.R
