@@ -74,6 +74,9 @@ source("./helper/plot_coverage.r")
 # plot_depth(samples_all, "../results/dilution_depth", sample_names=NA)
 p_depth <- plot_depth(df_ct_info$Sample[2:17], "../results/dilution_depth_Ct", sample_names=df_ct_info$info[2:17])
 
+df_source <- p_depth$data
+writexl::write_xlsx(df_source, "../results/source_data_supp_fig_15a.xlsx")
+
 ## mismatch of consensus_base
 df_extra_info_ref <- df_extra_info %>% filter(sample == samples_ref)
 df_extra_info_others <- df_extra_info %>% filter(sample != samples_ref)
@@ -254,6 +257,10 @@ p3_005 <- ggplot(df_roc_thresholds %>% filter(sample %in% samples_all[1:8]), aes
 p3_out <- p3_001+p3_002+p3_003+p3_004+plot_layout(ncol=2, guides='collect') & theme(legend.position='bottom') & guides(colour = guide_legend(nrow = 1, override.aes = list(size=10)))
 ggsave("../results/Dilution_threshold_maf_2.pdf", width=18, height=18)
 
+df_source <- p3_out$data
+writexl::write_xlsx(df_source, "../results/source_data_supp_fig_16.xlsx")
+
+
 # genome coverage
 df_coverage <- df_bam_rst %>% group_by(sample) %>% summarise(genome_cov=sum(reads_all>=10), average_depth=mean(reads_all)) %>% ungroup()
 df_coverage <- left_join(df_coverage %>% mutate(Sample=sample), df_ct_info %>% mutate(info=gsub("VOC0013-", "", info)), "Sample")
@@ -267,6 +274,9 @@ p4_1 <- ggplot(df_coverage, aes(x=log10(average_depth), y=genome_cov, label=info
 	scale_y_continuous(breaks=0:6*5000)+
 	theme_minimal()+
 	NULL
+
+df_source <- df_coverage
+writexl::write_xlsx(df_source, "../results/source_data_supp_fig_15b.xlsx")
 
 # Plot MAF fluctuation between samples
 df_num_isnvs <- df_roc_thresholds %>% filter(sample %in% samples_all[1:9]) %>% group_by(sample)%>% mutate(n_before_filter=sum(depth_cut==10 & sec_freq>=0.01)) %>% filter(depth_cut==100, sec_freq>=0.025) %>% summarise(n_before_filter=n_before_filter[1], n=n(), n_tp=sum(tp))
@@ -289,6 +299,10 @@ p4_2 <- ggplot(df_num_isnvs)+
 	theme_minimal()+
 	theme(legend.position='bottom')+
 	NULL
+
+df_source <- df_num_isnvs
+writexl::write_xlsx(df_source, "../results/source_data_supp_fig_15c.xlsx")
+
 p4_btm <- ((p4_1+ggtitle("B"))/(p4_2+ggtitle("C"))+plot_layout(heights = c(1, 1.2)))
 p4 <- (p_depth+theme_minimal()+ggtitle("A"))/p4_btm+plot_layout(heights = c(0.6, 1))
 ggsave("../results/Dilution_genome_coverage.pdf", height=10, width=8)

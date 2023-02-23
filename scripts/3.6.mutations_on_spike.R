@@ -46,6 +46,8 @@ groups_unique <- sort(as.character(unique(df_spike_nonsyn_muts$Group_more)))
 muts_list <- list()
 features_list <- list()
 
+df_source <- tibble()
+
 for (group_i in groups_unique) {
 	df_tmp <- df_spike_nonsyn_muts %>% filter(Group_more==group_i, N>1) # only shows occurrence more than once
 	if(nrow(df_tmp)>1){
@@ -57,6 +59,7 @@ for (group_i in groups_unique) {
 		# Mutations$color <- as.character(df_tmp$color)
 		muts_list[[group_i]] <- Mutations
 		features_list[[group_i]] <- features
+		df_source <- bind_rows(df_source, df_tmp)
 	}	
 }
 
@@ -82,3 +85,4 @@ mut_aa_int <- df_spike_nonsyn_muts %>% filter(spike_regions=="RBD") %>% .$mut_aa
 df_snvs_meta_add_qc %>% filter(mut_aa %in% mut_aa_int) %>% select(Group, sample, mut_aa) %>% arrange(Group, sample)
 
 df_spike_nonsyn_muts %>% filter(N>1) %>% arrange(Group_more, pos_aa, desc(N)) %>% write_csv("../results/df_spike_nonsyn_muts.csv")
+writexl::write_xlsx(df_source, "../results/source_data_figure4.xlsx")

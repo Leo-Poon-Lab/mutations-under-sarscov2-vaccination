@@ -49,7 +49,6 @@ quantile(df_meta$collection_lag, na.rm=T, 1:100/100)
 median(df_meta$collection_lag, na.rm=T)
 mean(df_meta$collection_lag, na.rm=T)
 
-
 df_meta$vaccine_doses <- paste0(df_meta$Vaccine, "\n(Doses=", df_meta$Doses, ")")
 df_meta$vaccine_doses[df_meta$Vaccine=="Unvaccinated"] <- "Unvaccinated"
 
@@ -60,7 +59,7 @@ df_meta$vaccine_doses <- factor(df_meta$vaccine_doses, levels = names(colors_vac
 which((is.na(df_meta$Ct_value)) & (!is.na(df_meta$Ct)))
 source("./helper/df_test.R")
 df_test <- cal_wilc_test(df_meta, "Ct_value", genes=NA)
-highlight_diff(df_test) %>% filter(check_p_adj) %>% select(var1, var2, p_value_adj, notation_adj) %>% t()
+highlight_diff(df_test) %>% filter(check_p_adj) %>% select(var1, var2, p_value_adj, notation_adj) %>% mutate(p_value_adj=round(p_value_adj,3)) %>% t()
 
 # wilcox.test(df_meta %>% filter(Vaccine=="Unvaccinated") %>% filter(lineage_sim %in% names(colors_lineage)[1:2]) %>% .$Ct_value, df_meta %>% filter(Vaccine=="Unvaccinated") %>% filter(!lineage_sim %in% names(colors_lineage)[1:2]) %>% .$Ct_value)
 
@@ -68,7 +67,7 @@ p1_1 <- plot_box(df_plot=df_meta %>% filter(Vaccine=="Unvaccinated"), x_var="vac
 p1_1 <- p1_1 + scale_color_manual(name="Lineage", values=colors_lineage)
 p1_1_p <- p1_1+ # unvaccinated
    # ggtitle("A")+
-   geom_signif(y_position = 28.5+seq(0,3)/1.5, xmin = c(0.85, 0.85, 0.85, 0.85), xmax = c(0.7, 1, 1.15, 1.3), annotation = c("**", "**", "**", "**"), color="black", vjust=0.65, tip_length = 0.01)
+   geom_signif(y_position = 28.5+seq(0,3)/1.5, xmin = c(0.85, 0.85, 0.85, 0.85), xmax = c(0.7, 1, 1.15, 1.3), annotation = c("** (p=0.000)", "** (p=0.000)", "** (p=0.002)", "** (p=0.000)"), color="black", tip_length = 0.01, textsize = 1.5)
 
 p1_2 <- plot_box(df_plot=df_meta %>% filter(lineage_sim%in%names(colors_lineage)[4:5]), x_var="lineage_sim", y_var="Ct_value", color_var="vaccine_doses", y_lab="Ct value", x_lab="Lineage")
 p1_2 <- p1_2 + scale_color_manual(name="Vaccine", values=colors_vaccine_doses) + 
@@ -96,13 +95,13 @@ ggsave("../results/Ct_value_by_time.pdf", width=8, height=6)
 # Collection timepoints during acute infection
 source("./helper/df_test.R")
 df_test <- cal_wilc_test(df_meta, "collection_lag", genes=NA)
-highlight_diff(df_test) %>% filter(check_p_adj) %>% select(var1, var2, median_var1, median_var2, notation_adj) %>% t()
+highlight_diff(df_test) %>% filter(check_p_adj) %>% select(var1, var2, median_var1, median_var2, notation_adj, p_value_adj) %>% t()
 
 p2_1 <- plot_box(df_plot=df_meta %>% filter(Vaccine=="Unvaccinated"), x_var="vaccine_doses", y_var="collection_lag", color_var="lineage_sim", y_lab="Collection lag (days)", x_lab="Vaccine")
 p2_1 <- p2_1 + scale_color_manual(name="Lineage", values=colors_lineage)
 p2_1_p <- p2_1+ # unvaccinated
    # ggtitle("A")+
-   geom_signif(y_position = 20+seq(0,0)/1.5, xmin = c(0.85), xmax = c(1.15), annotation = c("*"), color="black", vjust=0.65, tip_length = 0.01)
+   geom_signif(y_position = 20+seq(0,0)/1.5, xmin = c(0.85), xmax = c(1.15), annotation = c("* (p=0.012)"), color="black", tip_length = 0.01, textsize=2.5)
 
 p2_2 <- plot_box(df_plot=df_meta %>% filter(lineage_sim%in%names(colors_lineage)[4:5]), x_var="lineage_sim", y_var="collection_lag", color_var="vaccine_doses", y_lab="Collection lag (days)", x_lab="Lineage")
 p2_2 <- p2_2 + scale_color_manual(name="Vaccine", values=colors_vaccine_doses) 
@@ -184,6 +183,14 @@ df_meta$specimen_type[df_meta$specimen_type=="Stool"] <- NA
 p_3_3 <- plot_box(df_plot=df_plot_n_gene_meta_adj_filter, x_var="specimen_type", y_var="n_per_kb_adj", color_var="lineage_sim", y_lab="Number of iSNVs per Kb (adjusted)", x_lab="Specimen type")+facet_grid(rows=vars(vaccine_doses), cols=vars(lineage_sim), scale="free_x", space="free")
 p_3_3 <- p_3_3 + scale_color_manual(name="Lineage", values=colors_lineage)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), legend.position='bottom')
 
+df_source <- df_plot_n_gene_meta_adj_filter %>% select(vaccine_doses, lineage_sim, specimen_type, n_per_kb_adj)
+writexl::write_xlsx(df_source, "../results/source_data_supp_figure11.xlsx")
+df_group_summary <- df_plot_n_gene_meta_adj_filter %>% group_by(vaccine_doses, lineage_sim, specimen_type) %>% summarise(N=n())
+df_group_summary$vaccine_doses <- as.character(df_group_summary$vaccine_doses)
+df_group_summary$vaccine_doses <- gsub("\n", " ", df_group_summary$vaccine_doses, fixed=T)
+writexl::write_xlsx(df_group_summary, "../results/suppl_table_7.xlsx")
+
+
 df_input <- df_plot_n_gene_meta_adj_filter
 df_groups <- df_input %>% select(lineage_sim) %>% unique()
 df_input$specimen_type <- gsub(" ", ".", df_input$specimen_type)
@@ -251,14 +258,15 @@ annotation_df <- data.frame(
   start = c("Throat saliva"),
   end = c("Throat and nasal swab"),
   y = c(3.8),
-  label = c("*")
+  label = c("* (p=0.019)"),
 )
 
 p_3_3 +
   geom_signif(
     data = annotation_df,
     aes(xmin = start, xmax = end, annotations = label, y_position = y), color="black",
-    # textsize = 3, vjust = -0.2,
+    textsize = 1.5,
+	#  vjust = -0.2,
     manual = TRUE
   )
 ggsave("../results/num_isnvs_by_Specimen_type_by_group.pdf", width=12, height=12)
@@ -288,14 +296,16 @@ p_4_1_p <- p_4_1 +
 	geom_signif(y_position = 350+seq(0,4)*10, xmin = c(0.7, 0.7, 0.7, 1.1, 1.1)+1, xmax = c(0.9, 1.1, 1.3, 0.9, 1.3)+1, annotation = c("**", "**", "**", "**", "**"), color="black", vjust=0.65, tip_length = 0.01)
 ggsave("../results/days_since_last_dose_by_lineage.pdf", width=8, height=6)
 
-highlight_diff(df_test) %>% filter(p_value_adj<0.05) %>% filter(same_vaccine) %>% arrange(var1, var2) %>% select(var1, var2, p_value_adj, notation_adj) %>% t()
+highlight_diff(df_test) %>% mutate(p_value_adj=round(p_value_adj,3)) %>% filter(p_value_adj<0.05) %>% filter(same_vaccine) %>% arrange(var1, var2) %>% select(var1, var2, p_value_adj, notation_adj) %>% t()
 
 p_4_2 <- plot_box(df_plot=df_meta %>% filter(Vaccine!="Unvaccinated"), x_var="vaccine_doses", y_var="days_since_last_dose", color_var="lineage_sim", y_lab="Days since last dose", x_lab="Vaccine")
 p_4_2 <- p_4_2 + scale_color_manual(name="Vaccine", values=colors_lineage[4:5])
 
 p_4_2_p <- p_4_2 +
-	geom_signif(y_position = 350+seq(0,0)*10, xmin = c(0.8)+0, xmax = c(1.2)+0, annotation = c("**"), color="black", vjust=0.65, tip_length = 0.01)
+	geom_signif(y_position = 350+seq(0,0)*10, xmin = c(0.8)+0, xmax = c(1.2)+0, annotation = c("** (p=0.000)"), color="black",  tip_length = 0.01,  textsize=2.5)
 ggsave("../results/days_since_last_dose_by_vaccine.pdf", width=8, height=6)
+df_source <- df_meta %>% filter(Vaccine!="Unvaccinated") %>% select(sample, vaccine_doses, days_since_last_dose)
+writexl::write_xlsx(df_source, "../results/source_data_supp_fig4.xlsx")
 
 source("./helper/plot_reg.R")
 df_plot_n_gene_meta_adj <- left_join(df_plot_n_gene_meta_adj, df_meta %>% select(sample, days_since_last_dose), "sample")

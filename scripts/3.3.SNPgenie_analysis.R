@@ -801,17 +801,23 @@ max_dNdS <- max(intrahost_results_bootstrap_LONG$dNdS, na.rm = TRUE)
 max_d_SE_max <- max(intrahost_results_bootstrap_LONG$d_SE_max, na.rm = TRUE)
 
 intrahost_results_bootstrap_LONG$significance_P <- ""
-intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.1, ]$significance_P <- '^'
-intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.05, ]$significance_P <- '*'
-intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.01, ]$significance_P <- '**'
+intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.1, ]$significance_P <- paste0('^\np=', round(intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.1, ]$P_value,3), "")
+intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.05, ]$significance_P <- paste0('*\np=', round(intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.05, ]$P_value,3), "")
+intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.01, ]$significance_P <- paste0('**\np=', round(intrahost_results_bootstrap_LONG[! is.na(intrahost_results_bootstrap_LONG$P_value) & intrahost_results_bootstrap_LONG$P_value < 0.01, ]$P_value,3), "")
 write_xlsx(intrahost_results_bootstrap_LONG, "../results/intrahost_allProductsbygroup_PLOT_SOURCE.xlsx")
+
+df_source <- intrahost_results_bootstrap_LONG %>% select(gene_name, d_value, d_measure, d_SE_min, d_SE_max, outbreak, P_value, significance_P)
+write_xlsx(df_source %>% filter(gene_name %in% c("Full genome", "S")) %>% filter(grepl("Combined", outbreak) | grepl("Unvaccinated", outbreak)), "../results/source_data_figure2d.xlsx")
+write_xlsx(df_source %>% filter(!gene_name %in% c("Full genome", "S")) %>% filter(grepl("Combined", outbreak) | grepl("Unvaccinated", outbreak)), "../results/source_data_figure2e.xlsx")
+write_xlsx(df_source %>% filter(gene_name %in% c("Full genome", "S")) %>% filter(!(grepl("Unvaccinated", outbreak))), "../results/source_data_figure3d.xlsx")
+write_xlsx(df_source %>% filter(!gene_name %in% c("Full genome", "S")) %>% filter(!(grepl("Unvaccinated", outbreak))), "../results/source_data_figure3e.xlsx")
 
 ### PLOT
 gene_list_1 <- c("Full genome", "S") 
 gene_list_2 <- gene_names_allLevels[!gene_names_allLevels %in% gene_list_1]
 
 n_color <- nrow(filter(intrahost_error_bar_colors, gene_name %in% gene_list_1))/2
-(intrahost_allProductsbygroup_PLOT_1 <- ggplot(data = filter(intrahost_results_bootstrap_LONG, gene_name %in% gene_list_1),
+intrahost_allProductsbygroup_PLOT_1 <- ggplot(data = filter(intrahost_results_bootstrap_LONG, gene_name %in% gene_list_1),
                                     mapping = aes(x = gene_name, y = d_value * pi_corr_factor, group = d_measure)) + #fill = d_measure)) +
     # Backdrop boxes based on which pi is higher
     geom_bar(data = filter(intrahost_results_bootstrap_LONG, d_measure == 'dN', gene_name %in% gene_list_1), mapping = aes(y = Inf, fill = dNdS_norm), stat = 'identity') +
@@ -852,14 +858,14 @@ n_color <- nrow(filter(intrahost_error_bar_colors, gene_name %in% gene_list_1))/
     ylab(bquote('Differences per site (adjusted) ('*'x 10'^'-4'*')')) + 
     scale_x_discrete(guide = guide_axis(n.dodge = 2))+
     scale_y_continuous(breaks = scales::pretty_breaks(3), expand = expand_scale(mult = c(0, 0.1))) + # 0.1
-    scale_fill_gradient2(low = brewer.pal(9, "Blues")[5], mid = 'white', high = brewer.pal(9, "Reds")[5], midpoint = 0, na.value = "white", limits=c(-1,1))) 
+    scale_fill_gradient2(low = brewer.pal(9, "Blues")[5], mid = 'white', high = brewer.pal(9, "Reds")[5], midpoint = 0, na.value = "white", limits=c(-1,1))
 df_significance_label <- filter(intrahost_results_bootstrap_LONG, gene_name %in% gene_list_1) %>% group_by(outbreak) %>% mutate(group_max=max(d_SE_max)) %>% group_by(gene_name, outbreak) %>% summarise(significance_P=significance_P[1], d_SE_max = group_max*0.9, d_measure=d_measure[1])
 # p_out_1 <- intrahost_allProductsbygroup_PLOT_1 + geom_text(aes(x=gene_name, y=d_SE_max * pi_corr_factor, label=significance_P), data=df_significance_label)
-p_out_1 <- intrahost_allProductsbygroup_PLOT_1 + geom_text(aes(x=gene_name, y=1.4, label=significance_P), data=df_significance_label)
+p_out_1 <- intrahost_allProductsbygroup_PLOT_1 + geom_text(aes(x=gene_name, y=1.4, label=significance_P), data=df_significance_label, size=2, lineheight=0.5)
 
 
 n_color <- nrow(filter(intrahost_error_bar_colors, gene_name %in% gene_list_2))/2
-(intrahost_allProductsbygroup_PLOT_2 <- ggplot(data = filter(intrahost_results_bootstrap_LONG, gene_name %in% gene_list_2),
+intrahost_allProductsbygroup_PLOT_2 <- ggplot(data = filter(intrahost_results_bootstrap_LONG, gene_name %in% gene_list_2),
                                     mapping = aes(x = gene_name, y = d_value * pi_corr_factor, group = d_measure)) + #fill = d_measure)) +
     # Backdrop boxes based on which pi is higher
     geom_bar(data = filter(intrahost_results_bootstrap_LONG, d_measure == 'dN', gene_name %in% gene_list_2), mapping = aes(y = Inf, fill = dNdS_norm), stat = 'identity') +
@@ -901,10 +907,10 @@ n_color <- nrow(filter(intrahost_error_bar_colors, gene_name %in% gene_list_2))/
     ylab(bquote('Differences per site ('*'x 10'^'-4'*')')) + 
     scale_x_discrete(guide = guide_axis(n.dodge = 2))+
     scale_y_continuous(breaks = scales::pretty_breaks(3), expand = expand_scale(mult = c(0, 0.1))) + # 0.1
-    scale_fill_gradient2(low = brewer.pal(9, "Blues")[5], mid = 'white', high = brewer.pal(9, "Reds")[5], midpoint = 0, na.value = "white", limits=c(-1,1))) 
+    scale_fill_gradient2(low = brewer.pal(9, "Blues")[5], mid = 'white', high = brewer.pal(9, "Reds")[5], midpoint = 0, na.value = "white", limits=c(-1,1))
 df_significance_label <- filter(intrahost_results_bootstrap_LONG, gene_name %in% gene_list_2) %>% group_by(outbreak) %>% mutate(group_max=max(d_SE_max)) %>% group_by(gene_name, outbreak) %>% summarise(significance_P=significance_P[1], d_SE_max = group_max*0.9, d_measure=d_measure[1])
 # p_out_2 <- intrahost_allProductsbygroup_PLOT_2 + geom_text(aes(x=gene_name, y=d_SE_max * pi_corr_factor, label=significance_P), data=df_significance_label)
-p_out_2 <- intrahost_allProductsbygroup_PLOT_2 + geom_text(aes(x=gene_name, y=2.5, label=significance_P), data=df_significance_label)
+p_out_2 <- intrahost_allProductsbygroup_PLOT_2 + geom_text(aes(x=gene_name, y=7, label=significance_P), data=df_significance_label, size=2, lineheight=0.5)
 
 # ggsave("../results/helper.pdf")
 # save_pptx("../results/helper.pptx")
@@ -913,8 +919,7 @@ p_out_2 <- intrahost_allProductsbygroup_PLOT_2 + geom_text(aes(x=gene_name, y=2.
 p_out <- ((p_out_1 + ggtitle("A")) | (p_out_2+ggtitle("B"))) + plot_layout(guides="collect", widths=c(2,8)) & theme(legend.position='right')
 # SAVE PLOT
 ggsave(filename = "../results/intrahost_allProductsbygroup_PLOT.pdf", width = 8, height = 8*sqrt(2)-1, plot=p_out)
-save_pptx(file = "../results/intrahost_allProductsbygroup_PLOT.pptx", width = 6, height = 8*sqrt(2)-1,  plot=p_out)
-
+# save_pptx(file = "../results/intrahost_allProductsbygroup_PLOT.pptx", width = 6, height = 8*sqrt(2)-1,  plot=p_out)
 
 # PIVOT WIDE AND SAVE
 intrahost_results_bootstrap_LONG_WIDE <- pivot_wider(data = dplyr::select(intrahost_results_bootstrap_LONG, -significance, -dNdS_norm, -significance_P), 
@@ -1140,6 +1145,9 @@ mclapply(30, function(WINDOW_SIZE) {
 
 	file_out <- paste0("../results/", "codon_results_byProductCodon_WINDOWS_POOLED_LONG_size", WINDOW_SIZE, "_PLOT.pdf")
 	ggsave(file_out, width=8, height=10)
+
+  df_source <- filter(codon_results_byProductCodon_WINDOWS_POOLED_LONG, product %in% uniq_products_LONG_SORTED_KEEPERS) %>% select(product_segment, codon_num, sw_center, d_measure, d_value_CI_max, d_value_CI_min)
+  writexl::write_xlsx(df_source, "../results/source_data_supp_figure5.xlsx")
 
 })
 

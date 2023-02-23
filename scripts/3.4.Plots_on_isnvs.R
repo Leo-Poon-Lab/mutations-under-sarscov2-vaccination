@@ -20,7 +20,8 @@ vaccine_all <- sort(unique(df_meta$Vaccine))
 colors_vaccine=c("#a65628", "#7570b3", "#999999")
 names(colors_vaccine)=vaccine_all
 colors_vaccine_doses = c("#a65628", "#633318", "#7570b3", "#46436b", "#999999")
-names(colors_vaccine_doses)=c("Comirnaty\n(Doses=2)", "Comirnaty\n(Doses=3)", "CoronaVac\n(Doses=2)", "CoronaVac\n(Doses=3)", "Unvaccinated")
+# names(colors_vaccine_doses)=c("Comirnaty\n(Doses=2)", "Comirnaty\n(Doses=3)", "CoronaVac\n(Doses=2)", "CoronaVac\n(Doses=3)", "Unvaccinated")
+names(colors_vaccine_doses)=c("Comirnaty (Doses=2)", "Comirnaty (Doses=3)", "CoronaVac (Doses=2)", "CoronaVac (Doses=3)", "Unvaccinated")
 
 df_meta$lineage_sim <- factor(df_meta$lineage_sim, levels = names(colors_lineage))
 # collection lag
@@ -40,7 +41,7 @@ load("../results/df_plot_n_gene_adj.rdata")
 df_plot_n_gene_meta_adj$lineage_sim <- factor(df_plot_n_gene_meta_adj$lineage_sim, levels = names(colors_lineage))
 df_plot_n_gene_meta_adj <- left_join(df_plot_n_gene_meta_adj, df_meta %>% select(sample, Doses), "sample")
 df_plot_n_gene_meta_adj$Vaccine <- factor(df_plot_n_gene_meta_adj$Vaccine, levels=names(colors_vaccine), labels=names(colors_vaccine_new))
-df_plot_n_gene_meta_adj$vaccine_doses <- paste0(df_plot_n_gene_meta_adj$Vaccine, "\n(Doses=", df_plot_n_gene_meta_adj$Doses, ")")
+df_plot_n_gene_meta_adj$vaccine_doses <- paste0(df_plot_n_gene_meta_adj$Vaccine, " (Doses=", df_plot_n_gene_meta_adj$Doses, ")")
 df_plot_n_gene_meta_adj$vaccine_doses[df_plot_n_gene_meta_adj$Vaccine=="Unvaccinated"] <- "Unvaccinated"
 df_plot_n_gene_meta_adj$vaccine_doses <- factor(df_plot_n_gene_meta_adj$vaccine_doses, levels = names(colors_vaccine_doses))
 
@@ -50,7 +51,7 @@ df_snvs_meta_add_qc$lineage_sim <- factor(df_snvs_meta_add_qc$lineage_sim, level
 df_snvs_meta_add_qc <- bind_rows(df_snvs_meta_add_qc %>% mutate(gene = "Full genome"), df_snvs_meta_add_qc)
 write_csv(df_snvs_meta_add_qc, "../results/df_snvs_meta_add_qc_ivar_clean.csv")
 df_snvs_meta_add_qc$Vaccine <- factor(df_snvs_meta_add_qc$Vaccine, levels=names(colors_vaccine), labels=names(colors_vaccine_new))
-df_snvs_meta_add_qc$vaccine_doses <- paste0(df_snvs_meta_add_qc$Vaccine, "\n(Doses=", df_snvs_meta_add_qc$Doses, ")")
+df_snvs_meta_add_qc$vaccine_doses <- paste0(df_snvs_meta_add_qc$Vaccine, " (Doses=", df_snvs_meta_add_qc$Doses, ")")
 df_snvs_meta_add_qc$vaccine_doses[df_snvs_meta_add_qc$Vaccine=="Unvaccinated"] <- "Unvaccinated"
 df_snvs_meta_add_qc$vaccine_doses <- factor(df_snvs_meta_add_qc$vaccine_doses, levels = names(colors_vaccine_doses))
 
@@ -59,7 +60,7 @@ df_plot_pi <- read_csv("../results/codon_results_NOL_bySample.csv")
 df_plot_pi$lineage_sim <- factor(df_plot_pi$lineage_sim, levels = names(colors_lineage))
 df_plot_pi$Vaccine <- factor(df_plot_pi$Vaccine, levels = names(colors_vaccine), labels=names(colors_vaccine_new))
 
-df_plot_pi$vaccine_doses <- paste0(df_plot_pi$Vaccine, "\n(Doses=", df_plot_pi$Doses, ")")
+df_plot_pi$vaccine_doses <- paste0(df_plot_pi$Vaccine, " (Doses=", df_plot_pi$Doses, ")")
 df_plot_pi$vaccine_doses[df_plot_pi$Vaccine=="Unvaccinated"] <- "Unvaccinated"
 df_plot_pi$vaccine_doses <- factor(df_plot_pi$vaccine_doses, levels = names(colors_vaccine_doses))
 
@@ -82,7 +83,10 @@ p_pi_adj <- plot_reg(df_plot_pi, "Ct_value", "pi", x_lab="Ct value", y_lab=expre
 # p_out <- ((p_pre+ggtitle("A"))|(p_aft+ggtitle("B")))/(p_pre2+ggtitle("C")|(p_aft2+ggtitle("D")))/((p_maf+ggtitle("E"))|p_maf_adj+ggtitle("F"))/((p_pi+ggtitle("G"))|p_pi_adj+ggtitle("H"))
 p_out <- ((p_pre+ggtitle("A"))|(p_aft+ggtitle("B")))/((p_pi+ggtitle("C"))|p_pi_adj+ggtitle("D"))/(p_pre2+ggtitle("E")|(p_aft2+ggtitle("F")))
 ggsave("../results/n_per_kb_adjusted.pdf", width=10, height=10)
-
+df_source <- df_plot_n_gene_meta_adj %>% filter(gene=="Full genome") %>% left_join(df_plot_pi, by=c("sample", "Vaccine", "lineage_sim")) %>% select(sample, Vaccine, lineage_sim, Ct_value.x, n_per_kb, n_per_kb_adj, collection_lag.x, pi, pi_ori)
+df_source %>% filter(is.na(pi))
+df_source <- left_join(df_source, df_meta %>% select(sample, `Age (yr)`))
+writexl::write_xlsx(df_source, "../results/source_data_supp_figure2.xlsx")
 
 # test significance
 df_wilc_test <- cal_wilc_test(df_plot_n_gene_meta_adj, "n_per_kb_adj", genes = c("Full genome", "ORF1ab", "S"))
@@ -125,8 +129,7 @@ p_out <- p1_1_ori_p/p1_1_p + plot_layout(guides='collect') & theme(legend.positi
 ggsave("../results/Num_isnvs_by_vaccine_more.pdf", width=8, height=8)
 save_pptx("../results/Num_isnvs_by_vaccine_more.pptx", width=8, height=8)
 
-df_test_isnvs <- readxl::read_excel("../results/df_test_num_isnvs_by_vaccine_gene_more.xlsx")
-df_test_isnvs %>% filter(gene=="Full genome", check_p_adj, same_lineage) %>% select(var1, var2, notation_adj) %>% t()
+
 p1_2 <- plot_box(df_plot=df_plot_n_gene_meta_adj %>% filter(gene=="Full genome"), x_var="lineage_sim", y_var="n_per_kb_adj", color_var="vaccine_doses", y_lab="Number of iSNVs per Kb (adjusted)", x_lab="Lineage")
 p1_2 <- p1_2 + scale_color_manual(name="Vaccine", values=colors_vaccine_doses) + scale_x_discrete(guide = guide_axis(n.dodge = 2))
 
@@ -226,7 +229,6 @@ p3_1_p <- p3_1_p+ # unvaccinated
 ggsave("../results/diveristy_pi_more.pdf", width=8, height=6)
 save_pptx("../results/diveristy_pi_more.pptx", width=8, height=6)
 
-df_test_pi <- readxl::read_excel("../results/df_test_diversity_pi_by_vaccine_gene_more.xlsx")
 df_test_pi %>% filter(gene=="Full genome", check_p_adj, same_lineage) %>% select(var1, var2, notation_adj) %>% t()
 
 p3_2 <- plot_box(df_plot_pi, x_var="lineage_sim", y_var="pi", color_var="vaccine_doses", y_lab="Nucleotide diversity (adjusted)", x_lab="Lineage")
@@ -254,78 +256,96 @@ save_pptx("../results/diveristy_pi_2_more.pptx", width=8, height=6)
 
 # update on 2022-07-20
 ## Figure 2 upper
-df_test_isnvs %>% filter(gene=="Full genome", check_p_adj, same_vaccine) %>% select(var1, var2, notation_adj) %>% t()
+df_test_isnvs %>% filter(gene=="Full genome", check_p_adj, same_vaccine) %>% select(var1, var2, notation_adj, p_value_adj) %>% mutate(p_value_adj=round(p_value_adj, 3)) %>% t()
 p1_1 <- plot_box(df_plot=df_plot_n_gene_meta_adj %>% filter(gene=="Full genome", Vaccine=="Unvaccinated"), x_var="vaccine_doses", y_var="n_per_kb_adj", color_var="lineage_sim", y_lab="Number of iSNVs per Kb (adjusted)", x_lab="Vaccine")+theme(axis.title.x = element_blank())
 p1_1 <- p1_1 + scale_color_manual(name="Lineage", values=colors_lineage)
 p1_1_p <- p1_1+ # comirnaty 2-doses
    ggtitle("A")+
-   geom_signif(y_position = 2.5+seq(0,4)/5, xmin = c(4.7,4.7,4.85,4.85,4.85)-4, xmax = c(5,5.15,5,5.15,5.3)-4, annotation = c("*","**","**","**", "*"), color="black", vjust=0.65, tip_length = 0.01)
+   geom_signif(y_position = 2.5+seq(0,4)/5, xmin = c(4.7,4.7,4.85,4.85,4.85)-4, xmax = c(5,5.15,5,5.15,5.3)-4, annotation = c("* (p=0.021)","** (p=0.001)","** (p=0.003)","** (p=0.000)", "* (p=0.050)"), color="black", vjust=0.4, tip_length = 0.01, textsize=1.5)
+
+df_source <- df_plot_n_gene_meta_adj %>% filter(gene=="Full genome", Vaccine=="Unvaccinated") %>% select(vaccine_doses, n_per_kb_adj, lineage_sim)
+writexl::write_xlsx(df_source, "../results/source_data_figure_2a.xlsx")
 
 df_test_maf %>% filter(gene=="Full genome", check_p_adj, same_vaccine) %>% select(var1, var2, notation_adj) %>% t()
 p2_1 <- plot_box(df_snvs_meta_add_qc %>% filter(gene=="Full genome", Vaccine=="Unvaccinated"), x_var="vaccine_doses", y_var="sec_freq", color_var="lineage_sim", y_lab="MAF", x_lab="Vaccine")+theme(axis.title.x = element_blank())
 p2_1 <- p2_1 + scale_color_manual(name="Lineage", values=colors_lineage)
 
 p2_1_p <- p2_1 # no significant difference found
+df_source <- df_snvs_meta_add_qc %>% filter(gene=="Full genome", Vaccine=="Unvaccinated") %>% select(pos,sample, vaccine_doses, sec_freq, lineage_sim)
+writexl::write_xlsx(df_source, "../results/source_data_figure_2b.xlsx")
 
-df_test_pi %>% filter(gene=="Full genome", check_p_adj, same_vaccine) %>% select(var1, var2, notation_adj) %>% t()
+
+df_test_pi %>% filter(gene=="Full genome", check_p_adj, same_vaccine) %>% select(var1, var2, notation_adj, p_value_adj) %>% mutate(p_value_adj=round(p_value_adj, 3)) %>% t()
 p3_1 <- plot_box(df_plot_pi %>% filter(Vaccine=="Unvaccinated"), x_var="vaccine_doses", y_var="pi", color_var="lineage_sim", y_lab="Nucleotide diversity (adjusted)", x_lab="Vaccine")+theme(axis.title.x = element_blank())
 p3_1 <- p3_1 + scale_color_manual(name="Lineage", values=colors_lineage)
 p3_1_p <- p3_1+
    ggtitle("C")+ # unvaccinated
-   geom_signif(y_position = 0.0009+seq(0,3)/18000, xmin = c(4.7,4.7,4.85,4.85)-4, xmax = c(5,5.15,5,5.15)-4, annotation = c("*","**","**","**"), color="black", vjust=0.65, tip_length = 0.01)
+   geom_signif(y_position = 0.0009+seq(0,3)/18000, xmin = c(4.7,4.7,4.85,4.85)-4, xmax = c(5,5.15,5,5.15)-4, annotation = c("* (p=0.013)","** (p=0.007)","** (p=0.001)","** (p=0.001)"), color="black", vjust=0.4, tip_length = 0.01, textsize=1.5)
+
+df_source <- df_plot_pi %>% filter(Vaccine=="Unvaccinated") %>% select(vaccine_doses, pi, lineage_sim)
+writexl::write_xlsx(df_source, "../results/source_data_figure_2c.xlsx")
 
 p_out_upper_1 <- (p1_1_p) + (p2_1_p+ggtitle("B")) + (p3_1_p) + plot_layout(nrow=1, guides="collect") & theme(legend.position='bottom') & guides(col = guide_legend(nrow = 1))
 ggsave("../results/Figure 2_upper.pdf", width=8, height=4, plot= p_out_upper_1)
 
 ## Figure 3 upper
-df_test_isnvs %>% filter(gene=="Full genome", check_p_adj, same_lineage) %>% select(var1, var2, notation_adj) %>% t()
+df_test_isnvs %>% filter(gene=="Full genome", check_p_adj, same_lineage) %>% select(var1, var2, notation_adj, p_value_adj) %>% mutate(p_value_adj=round(p_value_adj,3)) %>% t()
 p1_2 <- plot_box(df_plot=df_plot_n_gene_meta_adj %>% filter(gene=="Full genome", lineage_sim %in% lineages_all[4:5]), x_var="lineage_sim", y_var="n_per_kb_adj", color_var="vaccine_doses", y_lab="Number of iSNVs per Kb (adjusted)", x_lab="Lineage")+theme(axis.title.x = element_blank())
 p1_2 <- p1_2 + scale_color_manual(name="Vaccine", values=colors_vaccine_doses, limits = force)
 p1_2_p <- p1_2 + # Delta
    ggtitle("A")+
-   geom_signif(y_position = 2.5+seq(0,0)/5, xmin = c(3.8)-3, xmax = c(4.2)-3, annotation = c("*"), color="black", vjust=0.65, tip_length = 0.01)
+   geom_signif(y_position = 2.5+seq(0,0)/5, xmin = c(3.8)-3, xmax = c(4.2)-3, annotation = c("* (p=0.022)"), color="black", vjust=0.4, tip_length = 0.01, textsize=1.5)
 p1_2_p <- p1_2_p + # Omicron
-   geom_signif(y_position = 2.5+seq(0,1)/5, xmin = c(4.7, 5)-3, xmax = c(4.85, 4.85)-3, annotation = c("**", "**"), color="black", vjust=0.65, tip_length = 0.01)
+   geom_signif(y_position = 2.5+seq(0,1)/5, xmin = c(4.7, 5)-3, xmax = c(4.85, 4.85)-3, annotation = c("** (p=0.000)", "** (p=0.006)"), color="black", vjust=0.4, tip_length = 0.01, textsize=1.5)
 p1_2_p <- p1_2_p + theme(legend.position='bottom') + guides(col = guide_legend(nrow = 1))+ scale_x_discrete(guide = guide_axis(n.dodge = 2))
+
+df_source <- df_plot_n_gene_meta_adj %>% filter(gene=="Full genome", lineage_sim %in% lineages_all[4:5]) %>% select(vaccine_doses, n_per_kb_adj, lineage_sim)
+writexl::write_xlsx(df_source, "../results/source_data_figure_3a.xlsx")
 
 df_test_maf %>% filter(gene=="Full genome", check_p_adj, same_lineage) %>% select(var1, var2, notation_adj) %>% t()
 p2_2 <- plot_box(df_snvs_meta_add_qc %>% filter(gene=="Full genome", lineage_sim %in% lineages_all[4:5]) , x_var="lineage_sim", y_var="sec_freq", color_var="vaccine_doses", y_lab="MAF", x_lab="Vaccine")+theme(axis.title.x = element_blank())
 p2_2 <- p2_2 + scale_color_manual(name="Vaccine", values=colors_vaccine_doses, limits = force)+ scale_x_discrete(guide = guide_axis(n.dodge = 2))
 
-df_test_pi %>% filter(gene=="Full genome", check_p_adj, same_lineage) %>% select(var1, var2, notation_adj) %>% t()
+df_source <- df_snvs_meta_add_qc %>% filter(gene=="Full genome", lineage_sim %in% lineages_all[4:5]) %>% select(vaccine_doses, sec_freq, lineage_sim)
+writexl::write_xlsx(df_source, "../results/source_data_figure_3b.xlsx")
+
+df_test_pi %>% filter(gene=="Full genome", check_p_adj, same_lineage) %>% select(var1, var2, notation_adj, p_value_adj) %>% mutate(p_value_adj=round(p_value_adj,3)) %>% t()
 
 p3_2 <- plot_box(df_plot_pi %>% filter(lineage_sim %in% lineages_all[4:5]) , x_var="lineage_sim", y_var="pi", color_var="vaccine_doses", y_lab="Nucleotide diversity (adjusted)", x_lab="Vaccine")+theme(axis.title.x = element_blank())
 p3_2 <- p3_2 + scale_color_manual(name="Vaccine", values=colors_vaccine_doses, limits = force)+ scale_x_discrete(guide = guide_axis(n.dodge = 2))
 p3_2_p <- p3_2 + # Delta
    ggtitle("C")+
-   geom_signif(y_position = 0.0009+seq(0,0)/18000, xmin = c(3.8)-3, xmax = c(4.2)-3, annotation = c("*"), color="black", vjust=0.65, tip_length = 0.01)
+   geom_signif(y_position = 0.0009+seq(0,0)/18000, xmin = c(3.8)-3, xmax = c(4.2)-3, annotation = c("* (p=0.029)"), color="black", vjust=0.4, tip_length = 0.01, textsize=1.5)
 p3_2_p <- p3_2_p + # Omicron
-    geom_signif(y_position = 0.0009+seq(0,3)/18000, xmin = c(4.85, 4.85, 4.85, 4.85)-3, xmax = c(4.7, 5, 5.15, 5.3)-3, annotation = c("**","**","*","*"), color="black", vjust=0.65, tip_length = 0.01)
+    geom_signif(y_position = 0.0009+seq(0,3)/18000, xmin = c(4.85, 4.85, 4.85, 4.85)-3, xmax = c(4.7, 5, 5.15, 5.3)-3, annotation = c("** (p=0.000)","** (p=0.002)","* (p=0.037)","* (p=0.017)"), color="black", vjust=0.4, tip_length = 0.01, textsize=1.5)
+
+df_source <- df_plot_pi %>% filter(lineage_sim %in% lineages_all[4:5]) %>% select(vaccine_doses, pi, lineage_sim)
+writexl::write_xlsx(df_source, "../results/source_data_figure_3c.xlsx")
 
 p_out_upper_2 <- (p1_2_p) + (p2_2+ggtitle("B")) + (p3_2_p) + plot_layout(nrow=1, guides="collect") & theme(legend.position='bottom') & guides(col = guide_legend(nrow = 1))
 ggsave("../results/Figure 3_upper.pdf", width=8, height=4, plot= p_out_upper_2)
 
 ## Figure S3
-df_test_isnvs %>% filter(gene=="Full genome", check_p_adj, same_vaccine) %>% select(var1, var2, notation_adj) %>% t()
+df_test_isnvs %>% filter(gene=="Full genome", check_p_adj, same_vaccine) %>% select(var1, var2, notation_adj, p_value_adj) %>% mutate(p_value_adj=round(p_value_adj,3)) %>% t()
 p1_1 <- plot_box(df_plot=df_plot_n_gene_meta_adj %>% filter(gene=="Full genome", lineage_sim %in% lineages_all[4:5]), x_var="vaccine_doses", y_var="n_per_kb_adj", color_var="lineage_sim", y_lab="Number of iSNVs per Kb (adjusted)", x_lab="Vaccine")+theme(axis.title.x = element_blank())
 p1_1 <- p1_1 + scale_color_manual(name="Lineage", values=colors_lineage, limits = force)
 p1_1_p <- p1_1+
    ggtitle("A")+ # Comirnaty_Doses2
-   geom_signif(y_position = 2.5, xmin = c(0.8), xmax = c(1.2), annotation = c("**"), color="black", vjust=0.65, tip_length = 0.01)
+   geom_signif(y_position = 2.5, xmin = c(0.8), xmax = c(1.2), annotation = c("** (p=0.006)"), color="black", vjust=0.2, tip_length = 0.01, textsize=1.5)
 
-df_test_maf %>% filter(gene=="Full genome", check_p_adj, same_vaccine) %>% select(var1, var2, notation_adj) %>% t()
+df_test_maf %>% filter(gene=="Full genome", check_p_adj, same_vaccine) %>% select(var1, var2, notation_adj,p_value_adj) %>% mutate(p_value_adj=round(p_value_adj,3)) %>% t()
 p2_1 <- plot_box(df_snvs_meta_add_qc %>% filter(gene=="Full genome", lineage_sim %in% lineages_all[4:5]), x_var="vaccine_doses", y_var="sec_freq", color_var="lineage_sim", y_lab="MAF", x_lab="Vaccine")+theme(axis.title.x = element_blank())
 p2_1 <- p2_1 + scale_color_manual(name="Lineage", values=colors_lineage, limits = force)
 p2_1_p <- p2_1+
    ggtitle("B")+
-   geom_signif(y_position = 0.5, xmin = c(0.8)+2, xmax = c(1.2)+2, annotation = c("*"), color="black", vjust=0.65, tip_length = 0.01)
+   geom_signif(y_position = 0.5, xmin = c(0.8)+2, xmax = c(1.2)+2, annotation = c("* (p=0.013)"), color="black", vjust=0.2, tip_length = 0.01, textsize=1.5)
 
-df_test_pi %>% filter(gene=="Full genome", check_p_adj, same_vaccine) %>% select(var1, var2, notation_adj) %>% t()
+df_test_pi %>% filter(gene=="Full genome", check_p_adj, same_vaccine) %>% select(var1, var2, notation_adj,p_value_adj) %>% mutate(p_value_adj=round(p_value_adj,3)) %>% t()
 p3_1 <- plot_box(df_plot_pi %>% filter(lineage_sim %in% lineages_all[4:5]), x_var="vaccine_doses", y_var="pi", color_var="lineage_sim", y_lab="Nucleotide diversity (adjusted)", x_lab="Vaccine")+theme(axis.title.x = element_blank())
 p3_1 <- p3_1 + scale_color_manual(name="Lineage", values=colors_lineage, limits = force)
 p3_1_p <- p3_1+
    ggtitle("C")+ # Comirnaty_Doses2
-   geom_signif(y_position = 0.0009+seq(0,0)/18000, xmin = c(0.8), xmax = c(1.2), annotation = "**", color="black", vjust=0.65, tip_length = 0.01)
+   geom_signif(y_position = 0.0009+seq(0,0)/18000, xmin = c(0.8), xmax = c(1.2), annotation = "** (p=0.003)", color="black", vjust=0.2, tip_length = 0.01, textsize=1.5)
 
 p_out_2 <- (p1_1_p) + (p2_1_p) + (p3_1_p) + plot_layout(ncol=1, guides="collect") & theme(legend.position='bottom') & guides(col = guide_legend(nrow = 1))
 

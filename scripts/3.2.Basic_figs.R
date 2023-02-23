@@ -95,6 +95,10 @@ p_n_isnvs <- ggplot(df_tmp) +
 	theme(legend.position = "top")+
 	NULL
 
+df_source <- df_tmp %>% select(sample, n, Ct_value_break)
+names(df_source) <- c("sample", "num_of_isnvs_in_a_sample", "Ct_value_break")
+writexl::write_xlsx(df_source, "../results/source_data_figure_1a.xlsx")
+
 # ## mutation rate of nt pairs
 # df_tmp <- left_join(df_snvs_meta_add_qc %>% select(sample, pos, con_base, sec_base), df_bam_rst[1:29903,] %>% select(pos, ref))
 
@@ -124,6 +128,10 @@ p_n_sharing <- ggplot(df_tmp %>% ungroup() %>% group_by(effect_sim,n) %>% summar
    # scale_y_break(breaks=c(3000, 10000), scales=0.8, expand=FALSE, ticklabels=c(5000, 10000))+
 	NULL
 
+df_source <- df_tmp %>% ungroup() %>% group_by(effect_sim,n) %>% summarise(n_group=n(), n_group_log10=log10(n_group))
+names(df_source)[2:3] <- c("Number of samples sharing iSNVs", "Number of iSNVs")
+writexl::write_xlsx(df_source[,1:3], "../results/source_data_figure_1b.xlsx")
+
 ## sequencing depth
 unique(df_bam_rst$sample)
 tmp <- df_bam_rst %>% group_by(sample) %>% summarise(meadian_depth=median(reads_all)) %>% .$meadian_depth
@@ -145,6 +153,9 @@ p_depth <- ggplot(df_rc_slide)+
    xlab("Genomic positions")+
 	NULL
 ggsave("../results/depth.pdf", width=10, height=6, plot=p_depth)
+
+write_tsv(df_rc_slide, "../results/source_data_supp_figure1.tsv")
+
 
 # iSNVs incidence across genome
 ### Average number of iSNVs per Kb
@@ -254,7 +265,9 @@ p1 <- ggplot(df_boot_m, aes(x=pos_cut)) +
    xlab("Genomic positions")+
 	ylab("iSNVs frequency per sample per Kb per\nsynonymous/non-synonymous site")+
 	NULL
-ggsave("../results/tmp.pdf")
+
+df_source <- df_boot_m
+writexl::write_xlsx(df_source, "../results/source_data_figure_1d.xlsx")
 
 df_plot_n_more <- df_plot_join %>% select(sample, pos_cut, n_per_kb, Vaccine, lineage_sim, effect_sim, group) %>% group_by(pos_cut, Vaccine, lineage_sim, effect_sim, group) %>% summarise(n=n(), n_per_kb_mean=mean(n_per_kb))
 write_xlsx(df_plot_n_more, "../results/iSNVs_incidence_across_genome_more.xlsx")
@@ -333,8 +346,9 @@ p_mut_type_boot <- ggplot(df_boot_m, aes(x=Mutation)) +
 	theme(legend.position = "top")+
    ylab("iSNVs frequency per sample per\nsynonymous/non-synonymous site")+
     NULL
-p_mut_type_boot
-ggsave("../results/tmp.pdf")
+
+df_source <- read_tsv("../results/df_boot_m_mutation_isnvs.tsv")
+writexl::write_xlsx(df_source, "../results/source_data_figure_1c.xlsx")
 
 ### Proportion of samples share iSNVs
 df_plot <- df_snvs_meta_add_qc
@@ -358,7 +372,10 @@ p2 <- ggplot(df_plot_n_mut) +
 	geom_text_repel(aes(x=pos, y=prop, label=mutation), data = . %>% filter(prop>0.05))+ # > 5%
 	# theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
 	NULL
-ggsave("../results/tmp.pdf")
+
+df_source <- df_plot_n_mut
+writexl::write_xlsx(df_source, "../results/source_data_figure_1e.xlsx")
+
 
 df_tmp <- df_plot %>% filter(mut_aa %in% (df_plot_n_mut %>% filter(prop>0.01) %>% .$mut_aa)) %>% group_by(mut_aa) %>% mutate(n_mut = n()) %>% group_by(lineage_sim,Vaccine, gene, mut_aa) %>% summarise(prop_mut=n()/n_mut[1]) %>% arrange(mut_aa, desc(prop_mut)) %>% ungroup() %>% mutate(mut_aa=gsub("p.", "", mut_aa, fixed=T))
 write_csv(df_tmp, "../results/shared_isnvs_in_different_groups.csv")
